@@ -27,7 +27,10 @@ def main():
     base_dir = os.getcwd()
 
     time_length = 16
-    train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length,mode = 'TRAIN')
+    # train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length,mode = 'TRAIN')
+    train_lab, val_lab, test_lab = utils.prepare_data_synthia(os.path.join(base_dir , "Data\\SYNTHIA-SEQS-01-SUMMER"), time_length)
+
+
     print(len(train_lab['input']))
     print(len(train_lab['output']))
     config = tf.ConfigProto()
@@ -85,7 +88,7 @@ def main():
             # Collect a batch of images
             for j in range(batch_size):
                 index = i* batch_size + j
-                img_output, img_input = stacks_train.get_data(index)
+                img_output, img_input = stacks_train.get_data_synthia(index)
 
                 with tf.device('/cpu:0'):
 

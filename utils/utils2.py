@@ -28,6 +28,7 @@ def prepare_data(dataset_dir, time_length, mode = 'TRAIN'):
     val_names={'input':[], 'output':[]}
     test_names={'input':[], 'output':[]}
     print('Reading training files...')
+
     for path, subdirs, files in os.walk(dataset_dir + "\\train"):
         for name in files:
             if '.mp4' in name:
@@ -69,6 +70,42 @@ def prepare_data(dataset_dir, time_length, mode = 'TRAIN'):
 
     return train_names,val_names,test_names
 
+def prepare_data_synthia(dataset_dir, time_length):
+    train_names={'input':[], 'output':[]}
+    val_names={'input':[], 'output':[]}
+    test_names={'input':[], 'output':[]}
+    input_names = []
+    output_names = []
+    print('Reading files...')
+
+    for path, subdirs, files in os.walk(dataset_dir + "\\RGB\\Stereo_Right"):
+        for name in files:
+            input_names.append(os.path.join(path, name))
+        input_names = input_names[:-time_length]
+    for path, subdirs, files in os.walk(dataset_dir + "\\GT\\LABELS\\Stereo_Right"):
+        for name in files:
+            output_names.append(os.path.join(path, name))
+        output_names = output_names[:-time_length]
+    ids = range(0,len(input_names))
+    train_ind = random.sample(ids,len(input_names)*0.70)
+    ids = ids.difference(train_ind)
+    val_ind = random.sample(ids,len(ids)*0.5)
+    test_ind = ids.difference(val_ind)
+
+    train_names['input'] = np.sort(input_names[train_ind])
+    train_names['output'] = np.sort(output_names[train_ind])
+    val_names['input'] = np.sort(input_names[val_ind])
+    val_names['output'] =np.sort( output_names[val_ind])
+    test_names['input'] = np.sort(input_names[test_ind])
+    test_names['output'] = np.sort(output_names[test_ind])
+
+    print('Done reading files!')
+
+
+    return train_names,val_names,test_names
+
+
+
 
 
 class Stacker:
@@ -89,6 +126,40 @@ class Stacker:
         return img_output_3d
 
 
+    def get_data_synthia(self,  frame_number):
+        """ Genereate Distance Transform from joints
+            by creating thick skeletons
+        """
+        size = 128
+        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
+        img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
+
+
+
+        cap = cv2.VideoCapture(self.info['input'][frame_number])
+
+
+        output_mat = sio.loadmat(self.info['output'][frame_number])
+        i = 0
+
+
+        while i < self.time_length:
+            frame = cv2.imread(self.info['input'][frame_number + i])
+            temp = cv2.imread(self.info['output'][frame_number + i])
+            img_input_3d[i,:,:,:] = cv2.resize(frame, (size,size))
+            #inside == 0, outside == 1
+            temp = cv2.resize(temp, (size,size))
+            temp = np.where(temp ==0, 1 - temp, 0)
+            img_output_3d[i,:,:] = temp
+            i += 1
+
+        img_output_3d =  self.distance_transform(img_output_3d, mode ='signed')
+
+        cv2.imshow('s',img_output_3d[0,:,:])
+        Visualizer_3D().visualize_3d_volume(img_output_3d)
+        cv2.waitKey(0)
+        
+        return img_output_3d, img_input_3d
 
 
     def get_data(self,  frame_number):
@@ -128,7 +199,7 @@ class Stacker:
         #     img_output_3d[i,:,:] = cv2.normalize(img_output_3d[i,:,:],  0, 255, cv2.NORM_MINMAX)
         # cv2.imshow('s',img_output_3d[0,:,:])
         # Visualizer_3D().visualize_3d_volume(img_output_3d)
-            # cv2.waitKey(1)
+        #
         # cv2.waitKey(0)
         return img_output_3d, img_input_3d
 
