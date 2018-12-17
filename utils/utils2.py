@@ -136,10 +136,7 @@ class Stacker:
 
 
 
-        cap = cv2.VideoCapture(self.info['input'][frame_number])
 
-
-        output_mat = sio.loadmat(self.info['output'][frame_number])
         i = 0
 
 
@@ -149,16 +146,16 @@ class Stacker:
             img_input_3d[i,:,:,:] = cv2.resize(frame, (size,size))
             #inside == 0, outside == 1
             temp = cv2.resize(temp, (size,size))
-            temp = np.where(temp ==0, 1 - temp, 0)
+            temp = np.where(temp == 8 or 10, 0, 1)
             img_output_3d[i,:,:] = temp
             i += 1
 
         img_output_3d =  self.distance_transform(img_output_3d, mode ='signed')
 
-        cv2.imshow('s',img_output_3d[0,:,:])
-        Visualizer_3D().visualize_3d_volume(img_output_3d)
-        cv2.waitKey(0)
-        
+        # cv2.imshow('s',img_output_3d[0,:,:])
+        # Visualizer_3D().visualize_3d_volume(img_output_3d)
+        # cv2.waitKey(0)
+
         return img_output_3d, img_input_3d
 
 
