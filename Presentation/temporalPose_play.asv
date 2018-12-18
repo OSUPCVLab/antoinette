@@ -1,0 +1,56 @@
+% Nima A. Gard
+% Visualizing semantic segmentation for CityScape Dataset
+
+close all
+base = dir('E:\Datasets\Nima\files from training\results1\');
+T = 6;
+v = VideoWriter(strcat('results1\output_',num2str(200,'%06d')));
+v.FrameRate = 5;
+open(v)
+
+path = strcat(base(3).folder,'\',base(3).name,'\');
+img_files = dir(strcat(path,'*_gt_img.png')); 
+img = imread(strcat(path, img_files(1).name));
+[w, h] = size(img);
+
+
+fig = figure('position',[0 0 h*T w*T]);
+clear('f');
+ax1 = axes('Parent',fig);
+ax2 = axes('Parent',fig);
+set(ax1, 'Visible','off');
+set(ax2, 'Visible','off');
+
+for i=1:nfiles
+    for k = 3 : T*2+2
+    path = strcat(base(k).folder,'\',base(k).name,'\');
+    img_files = dir(strcat(path,'*_gt_img.png')); 
+    ann_files = dir(strcat(path,'*_sub2.png'));  
+
+    
+  
+    nfiles = length(img_files);    % Number of files found
+
+ 
+       img =imread(strcat(path, img_files(i).name));
+       ann = imread(strcat(path, ann_files(i).name));
+
+       subplot(T,T,(k-2)*2-1)
+       imshow(img);
+       subplot(T,T,(k-2)*2)
+       imshow(ann);
+
+
+       f(i) = getframe(fig);
+       writeVideo(v,f(i));
+
+    end
+end
+close all
+[h, w, p] = size(f(1).cdata);  % use 1st frame to get dimensions
+hf = figure; 
+% resize figure based on frame's w x h, and place at (150, 150)
+set(hf, 'position', [150 150 w h]);
+axis off
+movie(hf,f);
+close(v);

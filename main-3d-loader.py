@@ -64,6 +64,17 @@ def main():
 
     val_indices=random.sample(range(0,len(val_lab['input'])),num_vals)
 
+    # A vector of filenames.
+    filenames = tf.constant(train_lab['input'])
+    labels = tf.constant(train_lab['output'])
+    dataset = tf.data.Dataset.from_tensor_slices((filenames,labels))
+    dataset = dataset.map(
+    lambda filename, label: tuple(tf.py_func(
+        utils._read_py_function, [filename, label], [tf.uint8, tf.uint8])))
+    dataset = dataset.batch(2)
+    iterator = dataset.make_initializable_iterator()
+    next_element = iterator.get_next()
+
     stacks_train = utils.Stacker(train_lab, time_length)
     stacks_val = utils.Stacker(val_lab, time_length)
 

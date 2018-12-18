@@ -19,4 +19,5 @@ tfrecords.py
 *.json
 *.mp4
 *.mat
+*.avi
 Data/*

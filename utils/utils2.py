@@ -21,8 +21,8 @@ import matplotlib.pyplot as plt
 import vtk
 import vtk.util.numpy_support as nps
 import random
-
-
+import ntpath
+import tf
 def prepare_data(dataset_dir, time_length, mode = 'TRAIN'):
     train_names={'input':[], 'output':[]}
     val_names={'input':[], 'output':[]}
@@ -77,20 +77,32 @@ def prepare_data_synthia(dataset_dir, time_length):
     input_names = []
     output_names = []
     print('Reading files...')
-
+    num_files = 0
+    num_folders = 0
     for path, subdirs, files in os.walk(dataset_dir + "\\RGB\\Stereo_Right"):
         for name in files:
             input_names.append(os.path.join(path, name))
-        input_names = input_names[:-time_length]
+        num_files += len(files)
+        num_folders += len(subdirs)
+    # input_names = input_names[:-time_length]
     for path, subdirs, files in os.walk(dataset_dir + "\\GT\\LABELS\\Stereo_Right"):
         for name in files:
             output_names.append(os.path.join(path, name))
-        output_names = output_names[:-time_length]
-    ids = range(0,len(input_names))
-    train_ind = random.sample(ids,len(input_names)*0.70)
-    ids = ids.difference(train_ind)
-    val_ind = random.sample(ids,len(ids)*0.5)
-    test_ind = ids.difference(val_ind)
+    # output_names = output_names[:-time_length]
+
+    train_ind = []
+    val_ind = []
+    test_ind = []
+
+
+    ids = np.arange(0,num_files,time_length, dtype = np.int32)
+    train_ind = np.random.choice(ids,int(len(ids)*0.70),replace=False)
+    ids = np.setdiff1d(ids,train_ind)
+    val_ind = np.random.choice(ids,int(len(ids)*0.5),replace=False)
+    test_ind = np.setdiff1d(ids,val_ind)
+
+    input_names = np.asarray(input_names)
+    output_names = np.asarray(output_names)
 
     train_names['input'] = np.sort(input_names[train_ind])
     train_names['output'] = np.sort(output_names[train_ind])
@@ -135,18 +147,21 @@ class Stacker:
         img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
 
 
-
-
         i = 0
 
-
+        head_in, _  = ntpath.split(self.info['input'][frame_number])
+        head_out, _  = ntpath.split(self.info['output'][frame_number])
         while i < self.time_length:
-            frame = cv2.imread(self.info['input'][frame_number + i])
-            temp = cv2.imread(self.info['output'][frame_number + i])
+            frame = cv2.imread(os.path.join(head_in, '%06d.png'%(i + frame_number)))
+            # read uint16 and get R channel ->opencv channels BGR
+            temp = cv2.imread(os.path.join(head_out, '%06d.png'%(i + frame_number)),cv2.IMREAD_UNCHANGED)[:,:,2]
+
             img_input_3d[i,:,:,:] = cv2.resize(frame, (size,size))
             #inside == 0, outside == 1
             temp = cv2.resize(temp, (size,size))
-            temp = np.where(temp == 8 or 10, 0, 1)
+            f = temp == (8 or 10)
+
+            temp = np.where(f, 0, 1)
             img_output_3d[i,:,:] = temp
             i += 1
 
@@ -199,6 +214,39 @@ class Stacker:
         #
         # cv2.waitKey(0)
         return img_output_3d, img_input_3d
+
+# Use a custom OpenCV function to read the image, instead of the standard
+# TensorFlow `tf.read_file()` operation.
+def _read_py_function(filename, label):
+    size = 128
+    image_decoded = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
+    label_decoded = np.zeros((self.time_length,size, size), dtype = np.uint8)
+
+
+    i = 0
+
+    head_in, _  = ntpath.split(filename.decode())
+    head_out, _  = ntpath.split(label.decode())
+    while i < self.time_length:
+        frame = cv2.imread(os.path.join(head_in, '%06d.png'%(i + frame_number)))
+        # read uint16 and get R channel ->opencv channels BGR
+        temp = cv2.imread(os.path.join(head_out, '%06d.png'%(i + frame_number)),cv2.IMREAD_UNCHANGED)[:,:,2]
+
+        image_decoded[i,:,:,:] = cv2.resize(frame, (size,size))
+        #inside == 0, outside == 1
+        temp = cv2.resize(temp, (size,size))
+        f = temp == (8 or 10)
+
+        temp = np.where(f, 0, 1)
+        label_decoded[i,:,:] = temp
+        i += 1
+
+    label_decoded =  self.distance_transform(label_decoded, mode ='signed')
+
+  return image_decoded, label_decoded
+
+
+
 
 def remove_frame_deficient(data, time_length):
     # data['input'] = np.sort(data['input'])
@@ -392,7 +440,16 @@ class Visualizer_3D:
         self.vtk_show(renderer_1,renderer_2)
 
 
-
+def window(seq, n=3):
+    "Returns a sliding window (of width n) over data from the iterable"
+    "   s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ...                   "
+    it = iter(seq)
+    result = tuple(islice(it, n))
+    if len(result) == n:
+        yield result
+    for elem in it:
+        result = result[1:] + (elem,)
+        yield result
 
 # Print with time. To console or file
 def LOG(X, f=None):
