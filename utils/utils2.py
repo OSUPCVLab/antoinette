@@ -22,7 +22,7 @@ import vtk
 import vtk.util.numpy_support as nps
 import random
 import ntpath
-import tf
+# import tf
 def prepare_data(dataset_dir, time_length, mode = 'TRAIN'):
     train_names={'input':[], 'output':[]}
     val_names={'input':[], 'output':[]}
@@ -104,8 +104,8 @@ def prepare_data_synthia(dataset_dir, time_length):
     input_names = np.asarray(input_names)
     output_names = np.asarray(output_names)
 
-    train_names['input'] = np.sort(input_names[train_ind])
-    train_names['output'] = np.sort(output_names[train_ind])
+    train_names['input'] = np.sort(input_names[ids])
+    train_names['output'] = np.sort(output_names[ids])
     val_names['input'] = np.sort(input_names[val_ind])
     val_names['output'] =np.sort( output_names[val_ind])
     test_names['input'] = np.sort(input_names[test_ind])
@@ -243,7 +243,7 @@ def _read_py_function(filename, label):
 
     label_decoded =  self.distance_transform(label_decoded, mode ='signed')
 
-  return image_decoded, label_decoded
+    return image_decoded, label_decoded
 
 
 

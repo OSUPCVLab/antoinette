@@ -71,16 +71,25 @@ def main():
     dataset = dataset.map(
     lambda filename, label: tuple(tf.py_func(
         utils._read_py_function, [filename, label], [tf.uint8, tf.uint8])))
-    dataset = dataset.batch(2)
+    batch_size  = 2
+    dataset = dataset.shuffle(buffer_size=10000)
+    dataset = dataset.batch(batch_size)
     iterator = dataset.make_initializable_iterator()
     next_element = iterator.get_next()
 
-    stacks_train = utils.Stacker(train_lab, time_length)
-    stacks_val = utils.Stacker(val_lab, time_length)
+    # stacks_train = utils.Stacker(train_lab, time_length)
+    # stacks_val = utils.Stacker(val_lab, time_length)
 
-    batch_size  = 2
+
     label_values = []
-
+    # Compute for 100 epochs.
+    for _ in range(100):
+      sess.run(iterator.initializer)
+      while True:
+        try:
+          sess.run(next_element)
+        except tf.errors.OutOfRangeError:
+          break
     for epoch in range(EPOCHS):
         current_losses = []
         cnt = 0
