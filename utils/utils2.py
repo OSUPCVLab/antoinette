@@ -23,6 +23,15 @@ import vtk.util.numpy_support as nps
 import random
 import ntpath
 # import tf
+def prepare_video(dataset_dir, time_length, mode = 'TRAIN'):
+    test_names={'input':[], 'output':[]}
+    for path, subdirs, files in os.walk(dataset_dir):
+        for name in files:
+            if '.MOV' in name:
+                test_names['input'].append(os.path.join(path, name))
+
+    return test_names
+
 def prepare_data(dataset_dir, time_length, mode = 'TRAIN'):
     train_names={'input':[], 'output':[]}
     val_names={'input':[], 'output':[]}
@@ -125,14 +134,27 @@ class Stacker:
         self.info = info
         self.time_length =time_length
     def distance_transform(self, vol, mode ='unsigned'):
-
-        img_output_3d = ndimage.distance_transform_edt(vol)
-        img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d))
+        if mode == 'unsigned':
+            img_output_3d = ndimage.distance_transform_edt(vol)
+            img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d))
         if mode == 'signed':
+            img_output_3d = ndimage.distance_transform_edt(vol)
+            img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d))
             inside = vol == 0.0
             temp = ndimage.distance_transform_edt(1 - vol)
             temp = (temp - (np.min(temp))) / (np.max(temp) - np.min(temp))
             img_output_3d = np.where(inside,-temp, img_output_3d)
+        elif mode == 'thresh-signed':
+            img_output_3d = ndimage.distance_transform_edt(vol)
+            inside = vol == 0.0
+            temp = ndimage.distance_transform_edt(1 - vol)
+            img_output_3d = np.where(inside,np.maximum(-temp,-10), np.minimum(img_output_3d,10))
+            img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d))
+
+
+
+
+
         # np.savetxt('C:\\Users\\ajamgard.1\\Desktop\\TemporalPose\\tx.txt',img_output_3d[0,:,:], delimiter=',')
 #
         return img_output_3d
@@ -165,13 +187,15 @@ class Stacker:
             img_output_3d[i,:,:] = temp
             i += 1
 
-        img_output_3d =  self.distance_transform(img_output_3d, mode ='signed')
+        img_output_3d =  self.distance_transform(img_output_3d, mode ='thresh-signed')
 
         # cv2.imshow('s',img_output_3d[0,:,:])
         # Visualizer_3D().visualize_3d_volume(img_output_3d)
         # cv2.waitKey(0)
 
         return img_output_3d, img_input_3d
+
+
 
 
     def get_data(self,  frame_number):
@@ -206,14 +230,35 @@ class Stacker:
 
 
 
-        img_output_3d =  self.distance_transform(img_output_3d, mode ='signed')
+        img_output_3d =  self.distance_transform(img_output_3d, mode ='thresh-signed')
         # for i in range(16):
-        #     img_output_3d[i,:,:] = cv2.normalize(img_output_3d[i,:,:],  0, 255, cv2.NORM_MINMAX)
+            # img_output_3d[i,:,:] = cv2.normalize(img_output_3d[i,:,:],  0, 255, cv2.NORM_MINMAX)
         # cv2.imshow('s',img_output_3d[0,:,:])
         # Visualizer_3D().visualize_3d_volume(img_output_3d)
         #
         # cv2.waitKey(0)
         return img_output_3d, img_input_3d
+
+
+    def get_video(self,  frame_number):
+        """ Genereate Distance Transform from joints
+            by creating thick skeletons
+        """
+        size = 128
+        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
+        cap = cv2.VideoCapture(self.info['input'][0])
+
+        i = 0
+        ii = 0
+        while i < self.time_length:
+            ret, frame = cap.read()
+            if ii >= frame_number*(self.time_length-1):
+                img_input_3d[i,:,:,:] = cv2.resize(frame, (size,size))
+                i += 1
+            ii += 1
+        cap.release()
+
+        return [], img_input_3d
 
 # Use a custom OpenCV function to read the image, instead of the standard
 # TensorFlow `tf.read_file()` operation.

@@ -27,8 +27,8 @@ def main():
     base_dir = os.getcwd()
 
     time_length = 16
-    # train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length,mode = 'TRAIN')
-    train_lab, val_lab, test_lab = utils.prepare_data_synthia(os.path.join(base_dir , "Data\\SYNTHIA-SEQS-01-SUMMER"), time_length)
+    train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length,mode = 'TRAIN')
+    # train_lab, val_lab, test_lab = utils.prepare_data_synthia(os.path.join(base_dir , "Data\\SYNTHIA-SEQS-01-SUMMER"), time_length)
 
 
 
@@ -87,7 +87,7 @@ def main():
             # Collect a batch of images
             for j in range(batch_size):
                 index = i* batch_size + j
-                img_output, img_input = stacks_train.get_data_synthia(index)
+                img_output, img_input = stacks_train.get_data(index)
 
                 with tf.device('/cpu:0'):
 
@@ -143,7 +143,7 @@ def main():
 
             # Do the validation on a small set of validation images
             for ind in val_indices:
-                gt, input_image = stacks_val.get_data_synthia(ind)
+                gt, input_image = stacks_val.get_data(ind)
                 input_image = np.expand_dims(input_image,axis=0)
                 output_image = sess.run(network, feed_dict = {net_input: input_image/255.0})
                 output_image = np.array(output_image[0,:,:,:])
