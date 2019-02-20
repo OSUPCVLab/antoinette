@@ -37,7 +37,7 @@ def main():
     net_input =  tf.placeholder(tf.float32,shape=[None,time_length,None,None,3])
     net_output = tf.placeholder(tf.float32,shape=[None,time_length,None,None,1])#,None,num_classes
 
-    network = model_builder.build_model(model_name='Encoder-Decoder-Skip-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
+    network = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
     loss = tf.reduce_mean(tf.nn.l2_loss(network- net_output))#softmax_cross_entropy_with_logits_v2(logits = network, labels = net_output)
 
 

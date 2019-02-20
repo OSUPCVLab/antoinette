@@ -7,7 +7,8 @@ sys.path.append("models")
 from models.Encoder_Decoder import build_encoder_decoder
 from models.Siamese_Encoder_Decoder import build_siamese_encoder_decoder
 from models.Encoder_Decoder3D import build_encoder_decoder_3d
-
+from models.UNet3D import build_UNet_3d
+from models.UNet3D_AutoEncoder import build_UNet_3d_auto
 # from models.RefineNet import build_refinenet
 # from models.FRRN import build_frrn
 # from models.MobileUNet import build_mobile_unet
@@ -72,6 +73,10 @@ def build_model(model_name, net_input, num_classes,frontend="ResNet101", is_trai
         network = build_siamese_encoder_decoder(net_input, preset_model = model_name, num_classes=num_classes)
     elif model_name == "Encoder-Decoder-3D" or model_name == "Encoder-Decoder-Skip-3D":
         network = build_encoder_decoder_3d(net_input, preset_model = model_name, num_classes=num_classes)
+    elif model_name == "UNet-3D":
+        network = build_UNet_3d(net_input, preset_model = model_name, num_classes=num_classes)
+    elif model_name == "UNet-3D-Auto":
+        network, init_fn = build_UNet_3d_auto(net_input, preset_model = model_name, num_classes=num_classes)
 	# elif model_name == "MobileUNet" or model_name == "MobileUNet-Skip":
 	#     network = build_mobile_unet(net_input, preset_model = model_name, num_classes=num_classes)
 	# elif model_name == "PSPNet":
@@ -103,4 +108,4 @@ def build_model(model_name, net_input, num_classes,frontend="ResNet101", is_trai
     else:
         raise ValueError("Error: the model %d is not available. Try checking which models are available using the command python main.py --help")
 
-    return network
+    return network, init_fn

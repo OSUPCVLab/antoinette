@@ -21,3 +21,4 @@ tfrecords.py
 *.mat
 *.avi
 Data/*
+weights/*

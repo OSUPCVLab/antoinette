@@ -40,7 +40,7 @@ def conv_transpose_block(inputs, n_filters, kernel_size=(2, 2, 2), strides = (2,
 
 	# conv = tf.nn.conv3d_transpose(inputs, filter = [3,3,3,inputs.shape[4],n_filters],output_shape = [-1,n_filters,n_filters,n_filters], strides=[1,2,2,2,1], padding = 'SAME')
 	out = tf.nn.tanh(slim.batch_norm(conv))#changed relu to tanh, LeakyReLU
-		if dropout_p != 0.0:
+	if dropout_p != 0.0:
 	  out = slim.dropout(out, keep_prob=(1.0-dropout_p))
 	return out
 

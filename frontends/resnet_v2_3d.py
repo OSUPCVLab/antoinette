@@ -52,7 +52,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from frontends import resnet_utils_3d as resnet_utils_3d
+from frontends import resnet_utils_3d as resnet_utils
 
 slim = tf.contrib.slim
 resnet_arg_scope = resnet_utils.resnet_arg_scope
