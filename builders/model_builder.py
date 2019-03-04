@@ -108,4 +108,4 @@ def build_model(model_name, net_input, num_classes,frontend="ResNet101", is_trai
     else:
         raise ValueError("Error: the model %d is not available. Try checking which models are available using the command python main.py --help")
 
-    return network, init_fn
+    return network

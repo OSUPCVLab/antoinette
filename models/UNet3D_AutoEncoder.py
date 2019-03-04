@@ -13,8 +13,8 @@ import os,time,cv2
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.keras as keras
-from tensorflow import distributions as ds
-tfd = tf.contrib.distributions
+import tensorflow_probability as tfp
+tfd = tfp.distributions
 
 import numpy as np
 
@@ -170,6 +170,7 @@ def build_UNet_3d_auto(inputs, num_classes, preset_model = "UNet-3D", dropout_p=
 
 
 
+
 def make_encoder(inputs, code_size):
 	n_filters = 64
 	# Down 1
@@ -192,7 +193,7 @@ def make_encoder(inputs, code_size):
 	encode_2 = conv_block(encode_1, n_filters*8)
 	deconv_1 = conv_transpose_block(encode_2,  n_filters*4)
 
-	x = tf.layers.flatten(deconv_1)
+	x  = tf.reshape(deconv_1,[-1,n_filters*4*32*32*4])
 	x = tf.layers.dense(x, 200, tf.nn.relu)
 	x = tf.layers.dense(x, 200, tf.nn.relu)
 	loc = tf.layers.dense(x, code_size)
@@ -205,12 +206,12 @@ def make_prior(code_size):
 	return tfd.MultivariateNormalDiag(loc, scale)
 
 def make_decoder(code, data_shape):
+	n_filters = 64
 	x = code
 	x = tf.layers.dense(x, 200, tf.nn.relu)
-	x = tf.layers.dense(x, 200, tf.nn.relu)
-	logit = tf.layers.dense(x, np.prod(data_shape))
-	logit = tf.reshape(logit, [-1] + data_shape)
-	a_expand_2_1 = conv_block(logit, n_filters*4)
+	x = tf.layers.dense(x, 512*8, tf.nn.relu)
+	x = tf.reshape(x,[-1,4,32,32,1])
+	a_expand_2_1 = conv_block(x, n_filters*4)
 	a_expand_2_2 = conv_block(a_expand_2_1, n_filters*4)
 	a_deconv_3 = conv_transpose_block(a_expand_2_2, n_filters*2)
 
@@ -222,9 +223,10 @@ def make_decoder(code, data_shape):
 	# Up 3
 	a_expand_4_1 = conv_block(a_deconv_4, n_filters)
 	a_expand_4_2 = conv_block(a_expand_4_1, n_filters)
+	# a_deconv_5 = conv_transpose_block(a_expand_4_2, n_filters)
+	net2 = slim.conv3d(a_expand_4_2, 3, (1,1,1), activation_fn=None)
+	# # logit = tf.layers.dense(y, np.prod(data_shape))
+	# logit = tf.reshape(net2, [-1] + data_shape)
 
-	net2 = slim.conv3d(a_expand_4_2, 3, (1,1,1), activation_fn=None, scope='generation')
-
-
-	return net2
+	return tfd.Independent(tfd.Bernoulli(net2), 4)
   	# return tfd.Independent(tfd.Bernoulli(logit), 3)

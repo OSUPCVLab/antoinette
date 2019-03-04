@@ -22,6 +22,10 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+from models.UNet3D_AutoEncoder import *
+import tensorflow_probability as tfp
+tfd = tfp.distributions
+
 EPOCHS = 1000
 
 def main():
@@ -46,15 +50,19 @@ def main():
 	# loss = tf.reduce_mean(tf.nn.l2_loss(network- net_output))#softmax_cross_entropy_with_logits_v2(logits = network, labels = net_output)
 	# loss_l2 = tf.reduce_mean(tf.losses.huber_loss(network[:,:,:,0], net_output[:,:,:,0]))
 	# Define the model.
-	prior = model_builder.make_prior(code_size=2)
-	posterior = model_builder.make_encoder(net_input, code_size=2)
+	make_encoder_func = tf.make_template('encoder', make_encoder)
+	make_decoder_func = tf.make_template('decoder', make_decoder)
+	prior = make_prior(code_size=512)
+	posterior = make_encoder_func(net_input, code_size=512)
 	code = posterior.sample()
 
 	# Define the loss.
-	likelihood = make_decoder(code, [16, 128, 128, 3]).log_prob(net_input)
+	likelihood = make_decoder_func(code, [ 2,16, 128, 128, 3]).log_prob(net_input)
 	divergence = tfd.kl_divergence(posterior, prior)
 	loss = tf.reduce_mean(likelihood - divergence)
-	opt = tf.train.AdamOptimizer(0.001).minimize(-loss)
+	# opt = tf.train.AdamOptimizer(0.001).minimize(-loss)
+
+	samples = make_decoder_func(prior.sample(16), [1, 16, 128, 128, 3]).mean()
 	# loss_l2 = tf.reduce_mean(tf.nn.l2_loss(network- net_output))
 
 	# loss_dice = 1.0 - tl.cost.dice_coe(network[:,:,:,1] ,net_output[:,:,:,1])
@@ -65,9 +73,9 @@ def main():
 	# opt = tf.train.AdamOptimizer(learning_rate = 0.001 ).minimize(loss, var_list = [var for var in tf.trainable_variables()])
 
 	## New AdamOptimizer
-	# global_step = tf.Variable(0, name='global_step', trainable=False)
-	# learning_rate = tf.train.exponential_decay(0.0001, global_step, EPOCHS, 0.9, staircase=True)
-	# opt = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
+	global_step = tf.Variable(0, name='global_step', trainable=False)
+	learning_rate = tf.train.exponential_decay(0.0001, global_step, EPOCHS, 0.9, staircase=True)
+	opt = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(-loss, global_step=global_step)
 
 	saver = tf.train.Saver(max_to_keep  = 1000)
 	sess.run(tf.global_variables_initializer())
@@ -170,7 +178,7 @@ def main():
 				for ind in val_indices:
 					gt, input_image = stacks_val.get_refresh(ind)
 					input_image = np.expand_dims(input_image,axis=0)
-					output_image = sess.run(network, feed_dict = {net_input: input_image/255.0})
+					loss_test, code_test, output_image = sess.run([loss, code, samples], feed_dict = {net_input: input_image/255.0})
 					output_image = np.array(output_image[0,time_length-1,:,:,:])
 					output_image_pred_img = output_image*255.0
 					# output_image_pred = output_image[:,:,1]*255.0
@@ -211,16 +219,16 @@ def main():
 			plt.savefig(os.path.join(base_dir , 'loss_vs_epochs.png'))
 			plt.clf()
 
-			fig3, ax3 = plt.subplots(figsize=(11, 8))
-
-			ax3.plot(range(epoch+1), np.log(avg_loss_per_epoch))
-			ax3.set_title("Average log-loss vs epochs")
-			ax3.set_xlabel("Epoch")
-			ax3.set_ylabel("Current loss")
-
-			plt.savefig(os.path.join(base_dir , 'logloss_vs_epochs.png'))
-
-			plt.clf()
+			# fig3, ax3 = plt.subplots(figsize=(11, 8))
+			#
+			# ax3.plot(range(epoch+1), np.log(avg_loss_per_epoch))
+			# ax3.set_title("Average log-loss vs epochs")
+			# ax3.set_xlabel("Epoch")
+			# ax3.set_ylabel("Current loss")
+			#
+			# plt.savefig(os.path.join(base_dir , 'logloss_vs_epochs.png'))
+			#
+			# plt.clf()
 
 
 

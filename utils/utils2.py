@@ -163,38 +163,32 @@ def prepare_data_refresh(dataset_dir, time_length):
 
     return train_names,val_names,test_names
 
-
+def distance_transform( vol, mode ='unsigned'):
+    eps = 1e-15
+    if mode == 'unsigned':
+        img_output_3d = ndimage.distance_transform_edt(vol)
+        img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d)+ eps)
+    if mode == 'signed':
+        img_output_3d = ndimage.distance_transform_edt(vol)
+        img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d)+ eps)
+        inside = vol == 0.0
+        temp = ndimage.distance_transform_edt(1 - vol)
+        temp = (temp - (np.min(temp))) / (np.max(temp) - np.min(temp) + eps)
+        img_output_3d = np.where(inside,-temp, img_output_3d)
+    elif mode == 'thresh-signed':
+        img_output_3d = ndimage.distance_transform_edt(vol)
+        inside = vol == 0.0
+        temp = ndimage.distance_transform_edt(1 - vol)
+        img_output_3d = np.where(inside,np.maximum(-temp,-10), np.minimum(img_output_3d,10))
+        img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d)+ eps)
+        # np.savetxt('C:\\Users\\ajamgard.1\\Desktop\\TemporalPose\\tx.txt',img_output_3d[0,:,:], delimiter=',')
+#
+        return img_output_3d
 
 class Stacker:
     def __init__(self, info, time_length):
         self.info = info
         self.time_length =time_length
-    def distance_transform(self, vol, mode ='unsigned'):
-        eps = 1e-15
-        if mode == 'unsigned':
-            img_output_3d = ndimage.distance_transform_edt(vol)
-            img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d)+ eps)
-        if mode == 'signed':
-            img_output_3d = ndimage.distance_transform_edt(vol)
-            img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d)+ eps)
-            inside = vol == 0.0
-            temp = ndimage.distance_transform_edt(1 - vol)
-            temp = (temp - (np.min(temp))) / (np.max(temp) - np.min(temp) + eps)
-            img_output_3d = np.where(inside,-temp, img_output_3d)
-        elif mode == 'thresh-signed':
-            img_output_3d = ndimage.distance_transform_edt(vol)
-            inside = vol == 0.0
-            temp = ndimage.distance_transform_edt(1 - vol)
-            img_output_3d = np.where(inside,np.maximum(-temp,-10), np.minimum(img_output_3d,10))
-            img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d)+ eps)
-
-
-
-
-
-        # np.savetxt('C:\\Users\\ajamgard.1\\Desktop\\TemporalPose\\tx.txt',img_output_3d[0,:,:], delimiter=',')
-#
-        return img_output_3d
 
 
     def get_data_synthia(self,  frame_number):
@@ -224,7 +218,7 @@ class Stacker:
             img_output_3d[i,:,:] = temp
             i += 1
 
-        img_output_3d =  self.distance_transform(img_output_3d, mode ='thresh-signed')
+        img_output_3d =  distance_transform(img_output_3d, mode ='thresh-signed')
 
         # cv2.imshow('s',img_output_3d[0,:,:])
         # Visualizer_3D().visualize_3d_volume(img_output_3d)
@@ -267,7 +261,7 @@ class Stacker:
 
 
 
-        img_output_3d =  self.distance_transform(img_output_3d, mode ='thresh-signed')
+        img_output_3d =  distance_transform(img_output_3d, mode ='thresh-signed')
         # for i in range(16):
             # img_output_3d[i,:,:] = cv2.normalize(img_output_3d[i,:,:],  0, 255, cv2.NORM_MINMAX)
         # cv2.imshow('s',img_output_3d[0,:,:])
@@ -304,31 +298,31 @@ class Stacker:
         """
         size = 128
         img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
-        # img_output_3d_impl = np.zeros((self.time_length,size, size), dtype = np.uint8)
-        img_output_3d_img = np.zeros((self.time_length,size, size), dtype = np.uint8)
+        img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
         i = 0
 
 
         inp = self.info['input'][frame_number]
-        # out = self.info['output'][frame_number]
+        out = self.info['output'][frame_number]
         while i < self.time_length:
             frame = cv2.imread(os.path.join(inp, '%06d.png'%(i)))
             # read uint16 and get R channel ->opencv channels BGR
-            # temp = cv2.imread(os.path.join(out, '%06d.png'%(i)))[:,:,2]
+            temp = cv2.imread(os.path.join(out, '%06d.png'%(i)))[:,:,2]
             # print(temp.shape)
             # print(cv2.resize(frame, (size,size)).shape)
             img_input_3d[i,:,:,:] = cv2.resize(frame, (size,size))
             #inside == 0, outside == 1
-            # temp = cv2.resize(temp, (size,size))
-            # f = temp == 255
+            temp = cv2.resize(temp, (size,size))
+            f = temp == 255
 
-            # temp = np.where(f, 0, 1)
-            # img_output_3d_img[i,:,:] = cv2.cvtColor( cv2.resize(frame, (size,size)), cv2.COLOR_RGB2GRAY)
-            # img_output_3d_impl[i,:,:] = temp
+            temp = np.where(f, 0, 1)
+            # img_output_3d_img[i,:,:] = cv2.cvtColor(img_input_3d[i,:,:,:], cv2.COLOR_BGR2GRAY)/255.0
+            img_output_3d[i,:,:] = temp
 
             i += 1
 
-        # img_output_3d_impl =  self.distance_transform(img_output_3d_impl, mode ='thresh-signed')
+        # img_output_3d =  distance_transform(img_output_3d, mode ='thresh-signed')
+        # gradients = np.gradient(img_output_3d)
         # for i in range(16):
             # img_output_3d[i,:,:,0] = cv2.normalize(img_output_3d[i,:,:,0],  0, 255, cv2.NORM_MINMAX)
         # cv2.imshow('s',img_output_3d[0,:,:,0])
@@ -336,7 +330,7 @@ class Stacker:
         #
         # cv2.waitKey(0)
         # img_output_3d = np.stack((img_output_3d_img,img_output_3d_impl),axis = 3)
-        return img_input_3d, img_input_3d
+        return img_output_3d, img_input_3d
 
 # Use a custom OpenCV function to read the image, instead of the standard
 # TensorFlow `tf.read_file()` operation.

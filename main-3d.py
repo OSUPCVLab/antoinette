@@ -15,12 +15,13 @@ from utils import utils2 as utils, helpers
 from builders import model_builder
 import os
 import ntpath
+from tensorflow.python.framework import ops
 # use 'Agg' on matplotlib so that plots could be generated even without Xserver
 # running
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
+from scipy import ndimage
 EPOCHS = 1000
 
 def main():
@@ -44,7 +45,14 @@ def main():
 	network = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
 	# loss = tf.reduce_mean(tf.nn.l2_loss(network- net_output))#softmax_cross_entropy_with_logits_v2(logits = network, labels = net_output)
 	loss = tf.reduce_mean(tf.losses.huber_loss(network,net_output))
+	# loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = network,labels =net_output))
 
+
+	# np.savetxt('sd',output_derivatives, delimiter = ',' )
+	# loss_norms =
+	# loss_l2 =
+	# loss = lo
+	# loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = network,labels =net_output))
 	# opt = tf.train.AdamOptimizer(learning_rate = 0.001 ).minimize(loss, var_list = [var for var in tf.trainable_variables()])
 
 	## New AdamOptimizer

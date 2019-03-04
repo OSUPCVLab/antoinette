@@ -25,7 +25,7 @@ def conv_block(inputs, n_filters, kernel_size=(3, 3,3), strides = (1,1,1), dropo
 	conv = tf.layers.conv3d(inputs, n_filters, kernel_size, strides =strides, activation=None , padding = 'same')
 
 
-	out = tf.nn.tanh(slim.batch_norm(conv, fused=True)) #changed relu to tanh
+	out = tf.nn.relu(slim.batch_norm(conv, fused=True)) #changed relu to tanh
 	if dropout_p != 0.0:
 	  out = slim.dropout(out, keep_prob=(1.0-dropout_p))
 	return out
@@ -39,7 +39,7 @@ def conv_transpose_block(inputs, n_filters, kernel_size=(2, 2, 2), strides = (2,
 	conv = tf.layers.conv3d_transpose(inputs, n_filters, kernel_size=kernel_size, strides = strides, use_bias=False, padding = 'SAME')
 
 	# conv = tf.nn.conv3d_transpose(inputs, filter = [3,3,3,inputs.shape[4],n_filters],output_shape = [-1,n_filters,n_filters,n_filters], strides=[1,2,2,2,1], padding = 'SAME')
-	out = tf.nn.tanh(slim.batch_norm(conv))#changed relu to tanh, LeakyReLU
+	out = tf.nn.relu(slim.batch_norm(conv))#changed relu to tanh, LeakyReLU
 	if dropout_p != 0.0:
 	  out = slim.dropout(out, keep_prob=(1.0-dropout_p))
 	return out
@@ -120,6 +120,6 @@ def build_UNet_3d(inputs, num_classes, preset_model = "UNet-3D", dropout_p=0.5, 
 
 	final = tf.add(output_3_up, conv_5)
 
-	net = slim.conv3d(final, num_classes, (1,1,1), activation_fn= tf.nn.tanh, scope='logits')
+	net = slim.conv3d(final, num_classes, (1,1,1), activation_fn= tf.nn.sigmoid, scope='logits')
 
 	return net
