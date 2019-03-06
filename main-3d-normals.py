@@ -41,15 +41,15 @@ def compute_implicit_and_normals(data):
 
   return impl, gradients
 
-def combined_loss(y1,y2, sess):
-	impl1, grads1 = compute_implicit_and_normals(y1.eval(session = sess))
-	impl2, grads2 = compute_implicit_and_normals(y2.eval(session = sess))
+def combined_loss(net,output, normals, output_normals):
+	# impl1, grads1 = compute_implicit_and_normals(y1.eval(session = sess))
+	# impl2, grads2 = compute_implicit_and_normals(y2.eval(session = sess))
 
-	loss_l2 = tf.reduce_mean(tf.nn.l2_loss(tf.convert_to_tensor(impl1 - impl2, np.float32)))
-	loss_normals = tf.reduce_mean(tf.nn.l2_loss(tf.convert_to_tensor(grads1 - grads2, np.float32)))
+	loss_l2 = tf.reduce_mean(tf.losses.huber_loss(net , output))
+	loss_normals = tf.reduce_mean(tf.losses.huber_loss(normals ,output_normals))
 
 
-	return loss_l2 + loss_normals
+	return loss_l2 + 0.4*loss_normals
 
 
 def main():
@@ -69,12 +69,13 @@ def main():
 	num_classes =  1
 	net_input =  tf.placeholder(tf.float32,shape=[None,time_length,None,None,3])
 	net_output = tf.placeholder(tf.float32,shape=[None,time_length,None,None,1])#,None,num_classes
+	net_normals = tf.Variable(np.zeros((2,16,128,128,3), dtype = np.float32),  expected_shape = [None,time_length,None,None,3], name = 'normals', trainable=False)
 
-	network = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
+	network, normals = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
 	# loss = tf.reduce_mean(tf.nn.l2_loss(network- net_output))#softmax_cross_entropy_with_logits_v2(logits = network, labels = net_output)
 	# loss = tf.reduce_mean(tf.losses.huber_loss(network,net_output))
 	# loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = network,labels =net_output))
-	loss = combined_loss(network,  net_output, sess)
+	loss = combined_loss(network,  net_output, normals, net_normals)
 
 	# np.savetxt('sd',output_derivatives, delimiter = ',' )
 	# loss_norms =
@@ -125,11 +126,11 @@ def main():
 
 				input_image_batch = []
 				output_image_batch = []
-
+				normal_image_batch = []
 				# Collect a batch of images
 				for j in range(batch_size):
 					index = i* batch_size + j
-					img_output, img_input = stacks_train.get_refresh(index)
+					img_output, img_input, img_normals = stacks_train.get_refresh(index)
 
 					with tf.device('/cpu:0'):
 
@@ -141,16 +142,21 @@ def main():
 
 						output_image_batch.append(np.expand_dims(img_output, axis = 0))
 
+						img_normals  = np.float32(img_normals)
+						normal_image_batch.append(np.expand_dims(img_normals, axis = 0))
 
 				if batch_size == 1:
 					input_image_batch = input_image_batch[0]
 					output_image_batch = output_image_batch[0]
+					normal_image_batch = normal_image_batch[0]
 				else:
 					input_image_batch = np.squeeze(np.stack(input_image_batch, axis=1))
 					output_image_batch = np.stack(output_image_batch, axis=1)[0]
+					normal_image_batch =  np.squeeze(np.stack(normal_image_batch, axis=1))
 				_, current = sess.run([opt, loss],
 									feed_dict = {net_input : input_image_batch,
-												 net_output: output_image_batch})
+												 net_output: output_image_batch,
+                                                 net_normals : normal_image_batch})
 				current_losses.append(current)
 				cnt += 1
 				if cnt % 20 == 0:
@@ -186,16 +192,19 @@ def main():
 
 				# Do the validation on a small set of validation images
 				for ind in val_indices:
-					gt, input_image = stacks_val.get_refresh(ind)
+					gt, input_image, gt_normals = stacks_val.get_refresh(ind)
 					input_image = np.expand_dims(input_image,axis=0)
-					output_image = sess.run(network, feed_dict = {net_input: input_image/255.0})
+					output_image, output_normals = sess.run([network, normals], feed_dict = {net_input: input_image/255.0})
 					output_image = np.array(output_image[0,:,:,:])
+					output_normals = np.array(output_normals[0,:,:,:])
 
 					gt = gt[time_length-1,:,:]*255.0
 					output_image = output_image[time_length-1,:,:]*255.0
 
 					input_image = input_image[0,time_length-1,:,:,:]
 
+					output_normals = output_normals[time_length-1,:,:,:]*255.0
+					gt_normals = gt_normals[time_length-1,:,:,:]*255.0
 					# file_name = utils.filepath_to_name(filenames_val[ind][0])
 
 
@@ -204,7 +213,8 @@ def main():
 					cv2.imwrite(os.path.join(base_dir , "%s\\%04d\\%s_%04d_pred.png"%("checkpoints",epoch, file_name,ind)),np.uint8(output_image))
 					cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s_%04d_gt.png"%("checkpoints",epoch, file_name,ind)),np.uint8(gt))
 					cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s_%04d_gt_img.png"%("checkpoints",epoch, file_name,ind)),np.uint8(input_image))
-
+					cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s_%04d_gt_normals.png"%("checkpoints",epoch, file_name,ind)),np.uint8(gt_normals))
+					cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s_%04d_pred_normals.png"%("checkpoints",epoch, file_name,ind)),np.uint8(output_normals))
 			epoch_time=time.time()-epoch_st
 			remain_time=epoch_time*(EPOCHS-1-epoch)
 			m, s = divmod(remain_time, 60)

@@ -6,7 +6,7 @@ Copyright (c) 2018 PCVLab & ADL
 Licensed under the MIT License (see LICENSE for details)
 Written by Nima A. Gard
 """
-
+from __future__ import division
 import numpy as np
 import cv2
 import os
@@ -321,8 +321,25 @@ class Stacker:
 
             i += 1
 
-        # img_output_3d =  distance_transform(img_output_3d, mode ='thresh-signed')
-        # gradients = np.gradient(img_output_3d)
+        img_output_3d =  distance_transform(img_output_3d, mode ='thresh-signed')
+
+        ## Method 1)
+        # dx,dy,dz= np.gradient(img_output_3d)
+        # gradients = np.stack([dx,dy,dz],3)
+
+        ## Method 2)
+
+        h = [0.5,0.,-0.5]
+        w = [0.5,0.,-0.5]
+        t = [0.5,0.,-0.5]
+        tt, hh, ww = np.meshgrid(t,h,w,indexing='ij')
+        dt = ndimage.convolve(img_output_3d, tt)
+        dh = ndimage.convolve(img_output_3d, hh)
+        dw = ndimage.convolve(img_output_3d, ww)
+        gradients = np.stack([dt,dh,dw],3)
+        gradients[:,:,:,0] /= (np.linalg.norm(gradients,axis = 3) + 1e-15)
+        gradients[:,:,:,1] /= (np.linalg.norm(gradients,axis = 3) + 1e-15)
+        gradients[:,:,:,2] /= (np.linalg.norm(gradients,axis = 3) + 1e-15)
         # for i in range(16):
             # img_output_3d[i,:,:,0] = cv2.normalize(img_output_3d[i,:,:,0],  0, 255, cv2.NORM_MINMAX)
         # cv2.imshow('s',img_output_3d[0,:,:,0])
@@ -330,7 +347,7 @@ class Stacker:
         #
         # cv2.waitKey(0)
         # img_output_3d = np.stack((img_output_3d_img,img_output_3d_impl),axis = 3)
-        return img_output_3d, img_input_3d
+        return img_output_3d, img_input_3d, gradients
 
 # Use a custom OpenCV function to read the image, instead of the standard
 # TensorFlow `tf.read_file()` operation.
