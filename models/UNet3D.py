@@ -16,30 +16,34 @@ import tensorflow.contrib.keras as keras
 import numpy as np
 
 def compute_normlas(inputs):
-
-	# dx = tf.layers.conv3d(inputs, 1, (3,1,1), strides =(1,1,1), activation=None , padding = 'same')
-	# dy = tf.layers.conv3d(inputs, 1, (1,3,1), strides =(1,1,1), activation=None , padding = 'same')
-	# dz = tf.layers.conv3d(inputs, 1, (1,1,3), strides =(1,1,1), activation=None , padding = 'same')
-	h = [0.5,0.,-0.5]
-	w = [0.5,0.,-0.5]
-	t = [0.5,0.,-0.5]
-	tt, hh, ww = np.meshgrid(t,h,w,indexing='ij')
-	tt = np.expand_dims(tt, axis = 3)
-	tt = np.expand_dims(tt, axis = 4)
-	tt = tf.constant(tt, dtype=tf.float32)
-	hh = np.expand_dims(hh, axis = 3)
-	hh = np.expand_dims(hh, axis = 4)
-	hh = tf.constant(hh, dtype=tf.float32)
-	ww = np.expand_dims(ww, axis = 3)
-	ww = np.expand_dims(ww, axis = 4)
-	ww = tf.constant(ww, dtype=tf.float32)
-
-
-	dt = tf.nn.conv3d(inputs, filter = tt, strides=[1,1,1,1,1], padding='SAME', name ='convT')
-	dh = tf.nn.conv3d(inputs, hh, strides=[1,1,1,1,1], padding='SAME', name ='convH')
-	dw = tf.nn.conv3d(inputs, ww, strides=[1,1,1,1,1], padding='SAME', name ='convW')
-	normals = tf.concat([dt, dh, dw],4)
-
+#
+	dx = tf.layers.conv3d(inputs, 1, (3,1,1), strides =(1,1,1), activation=None , padding = 'same')
+	dy = tf.layers.conv3d(inputs, 1, (1,3,1), strides =(1,1,1), activation=None , padding = 'same')
+	dz = tf.layers.conv3d(inputs, 1, (1,1,3), strides =(1,1,1), activation=None , padding = 'same')
+# 	h = [0.5,0.,-0.5]
+# 	w = [0.5,0.,-0.5]
+# 	t = [0.5,0.,-0.5]
+# 	tt, hh, ww = np.meshgrid(t,h,w,indexing='ij')
+# 	tt = np.expand_dims(tt, axis = 3)
+# 	tt = np.expand_dims(tt, axis = 4)
+# 	tt = tf.constant(tt, dtype=tf.float32)
+# 	hh = np.expand_dims(hh, axis = 3)
+# 	hh = np.expand_dims(hh, axis = 4)
+# 	hh = tf.constant(hh, dtype=tf.float32)
+# 	ww = np.expand_dims(ww, axis = 3)
+# 	ww = np.expand_dims(ww, axis = 4)
+# 	ww = tf.constant(ww, dtype=tf.float32)
+#
+#
+# 	dt = tf.nn.conv3d(inputs, tt, strides=[1,1,1,1,1], padding='SAME', name ='convT')
+# 	dh = tf.nn.conv3d(inputs, hh, strides=[1,1,1,1,1], padding='SAME', name ='convH')
+# 	dw = tf.nn.conv3d(inputs, ww, strides=[1,1,1,1,1], padding='SAME', name ='convW')
+	normals = tf.concat([dx, dy, dz],4)
+# 	dt /= tf.norm(normals, axis = 4, keepdims=True)
+# 	dh /= tf.norm(normals, axis = 4, keepdims=True)
+# 	dw /= tf.norm(normals, axis = 4, keepdims=True)
+#
+#
 	return normals
 
 def conv_block(inputs, n_filters, kernel_size=(3, 3,3), strides = (1,1,1), dropout_p=0.0):
@@ -147,5 +151,5 @@ def build_UNet_3d(inputs, num_classes, preset_model = "UNet-3D", dropout_p=0.5, 
 	final = tf.add(output_3_up, conv_5)
 
 	net = slim.conv3d(final, num_classes, (1,1,1), activation_fn= tf.nn.tanh, scope='logits')
-	normals = compute_normlas(net)
+	normals = []#compute_normlas(net)
 	return net, normals

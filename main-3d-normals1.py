@@ -59,12 +59,12 @@ def compute_normlas(inputs):
 
 	return normals
 
-def combined_loss(net,output):
+def combined_loss(net,output, network_normals):
 	# impl1, grads1 = compute_implicit_and_normals(y1.eval(session = sess))
 	# impl2, grads2 = compute_implicit_and_normals(y2.eval(session = sess))
 
 	loss_l2 = tf.reduce_mean(tf.nn.l2_loss(net - output))
-	loss_normals = tf.reduce_mean(tf.nn.l2_loss(compute_normlas(output) - compute_normlas(net)))#compute_normlas(output)))
+	loss_normals = tf.reduce_mean(tf.nn.l2_loss(compute_normlas(output) - network_normals))#compute_normlas(output)))
 
 
 	return loss_l2 + 0.4*loss_normals
@@ -74,8 +74,8 @@ def main():
 	base_dir = os.getcwd()
 
 	time_length = 16
-	train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length,mode = 'TRAIN')
-	# train_lab, val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
+	# train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length,mode = 'TRAIN')
+	train_lab, val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
 
 	print('Number of training images: {}'.format(len(train_lab['input'])))
 	print('Number of validation images: {}'.format(len(val_lab['input'])))
@@ -90,11 +90,11 @@ def main():
 	net_normals = compute_normlas(net_output)
 	# net_normals = tf.Variable(np.zeros((2,16,128,128,3), dtype = np.float32),  expected_shape = [None,time_length,None,None,3], name = 'normals', trainable=False)
 
-	network,_ = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
+	network, network_normals = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
 	# loss = tf.reduce_mean(tf.nn.l2_loss(network- net_output))#softmax_cross_entropy_with_logits_v2(logits = network, labels = net_output)
 	# loss = tf.reduce_mean(tf.losses.huber_loss(network,net_output))
 	# loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = network,labels =net_output))
-	loss = combined_loss(network,  net_output)
+	loss = combined_loss(network,  net_output, network_normals)
 
 	# np.savetxt('sd',output_derivatives, delimiter = ',' )
 	# loss_norms =
@@ -150,7 +150,7 @@ def main():
 				# Collect a batch of images
 				for j in range(batch_size):
 					index = i* batch_size + j
-					img_output, img_input = stacks_train.get_data(index)
+					img_output, img_input = stacks_train.get_refresh(index)
 
 					with tf.device('/cpu:0'):
 
@@ -213,8 +213,8 @@ def main():
 				for ind in val_indices:
 					gt, input_image= stacks_val.get_refresh(ind)
 					input_image = np.expand_dims(input_image,axis=0)
-					output_image, output_normals = sess.run([network,compute_normlas(network)], feed_dict = {net_input: input_image/255.0})
-					# output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
+					# output_image, output_normals = sess.run([network,compute_normlas(network)], feed_dict = {net_input: input_image/255.0})
+					output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
 
 
 					gt_temp = np.float32(np.expand_dims(gt, axis = 3))
@@ -253,7 +253,8 @@ def main():
 
 
 
-
+			loss_print = "Current Average Loss Per Epoch = %.6f"%(avg_loss_per_epoch)
+			utils.LOG(loss_print)
 			ax2.plot(range(epoch+1), avg_loss_per_epoch)
 			ax2.set_title("Average loss vs epochs")
 			ax2.set_xlabel("Epoch")

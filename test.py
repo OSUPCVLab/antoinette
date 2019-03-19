@@ -29,8 +29,8 @@ def main():
     time_length = 16
     # train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length, 'TEST')
     # train_lab, val_lab, test_lab = utils.prepare_data_synthia(os.path.join(base_dir , "Data\\SYNTHIA-SEQS-01-SUMMER"), time_length)
-    test_lab = utils.prepare_video(os.path.join(base_dir , "Data"), time_length, 'TEST')
-    # train_lab, val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
+    # test_lab = utils.prepare_video(os.path.join(base_dir , "Data"), time_length, 'TEST')
+    train_lab, val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -60,7 +60,7 @@ def main():
     label_values = []
 
     for ind in range(470):#0,len(test_lab['input'])
-        gt, input_image =stacks_test.get_video(ind)# get_data(ind)#stacks_test.get_refresh(ind)#
+        gt, input_image =stacks_test.get_refresh(ind)#stacks_test.get_video(ind)# get_data(ind)#
         input_image = np.expand_dims(input_image,axis=0)
         output_image = sess.run(network, feed_dict = {net_input: input_image/255.0})
         output_image = np.array(output_image[0,:,:,:])
