@@ -64,8 +64,8 @@ def CameraOrientation(cam):
 
 class Visualizer_3D:
     def __init__(self):
-        # self.contour = vtk.vtkContourFilter()
-        self.contour = vtk.vtkMarchingCubes()
+        self.contour = vtk.vtkContourFilter()
+        # self.contour = vtk.vtkMarchingCubes()
         self.lut = vtk.vtkLookupTable()
         self.lut.SetTableRange(-1.0, 1.0)
         self.lut.Build()
@@ -254,7 +254,7 @@ class Visualizer_3D:
 
         sample = vtk.vtkSampleFunction()
         sample.SetImplicitFunction(implicit_volume)
-        sample.SetSampleDimensions(1000,512,512)
+        sample.SetSampleDimensions(512,512,512)
         sample.SetModelBounds(bounds)
         sample.ComputeNormalsOff()
 

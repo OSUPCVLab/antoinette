@@ -67,15 +67,15 @@ def combined_loss(net,output):
 	loss_normals = tf.reduce_mean(tf.nn.l2_loss(compute_normlas(output) - compute_normlas(net)))#compute_normlas(output)))
 
 
-	return loss_l2 + 0.4*loss_normals
+	return loss_l2 + 0.5*loss_normals
 
 
 def main():
 	base_dir = os.getcwd()
 
-	time_length = 16
-	train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length,mode = 'TRAIN')
-	# train_lab, val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
+	time_length = 4
+	# train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length,mode = 'TRAIN')
+	train_lab, val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
 
 	print('Number of training images: {}'.format(len(train_lab['input'])))
 	print('Number of validation images: {}'.format(len(val_lab['input'])))
@@ -105,7 +105,7 @@ def main():
 
 	## New AdamOptimizer
 	global_step = tf.Variable(0, name='global_step', trainable=False)
-	learning_rate = tf.train.exponential_decay(0.001, global_step, EPOCHS, 0.9, staircase=True)
+	learning_rate = tf.train.exponential_decay(0.0001, global_step, EPOCHS, 0.9, staircase=True)
 	opt = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
 
 	saver = tf.train.Saver(max_to_keep  = 1000)
@@ -150,7 +150,7 @@ def main():
 				# Collect a batch of images
 				for j in range(batch_size):
 					index = i* batch_size + j
-					img_output, img_input = stacks_train.get_data(index)
+					img_output, img_input = stacks_train.get_refresh_v2(index, 3)
 
 					with tf.device('/cpu:0'):
 
@@ -211,7 +211,7 @@ def main():
 
 				# Do the validation on a small set of validation images
 				for ind in val_indices:
-					gt, input_image= stacks_val.get_refresh(ind)
+					gt, input_image= stacks_val.get_refresh_v2(ind, 3)
 					input_image = np.expand_dims(input_image,axis=0)
 					output_image, output_normals = sess.run([network,compute_normlas(network)], feed_dict = {net_input: input_image/255.0})
 					# output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
@@ -252,7 +252,8 @@ def main():
 			scores_list = []
 
 
-
+			loss_print = "Current Average Loss Per Epoch = %.6f"%(mean_loss)
+			utils.LOG(loss_print)
 
 			ax2.plot(range(epoch+1), avg_loss_per_epoch)
 			ax2.set_title("Average loss vs epochs")

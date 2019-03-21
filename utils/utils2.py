@@ -264,9 +264,9 @@ class Stacker:
         """ Genereate Distance Transform from joints
             by creating thick skeletons
         """
-        size = 512
-        img_input_3d = np.zeros((self.time_length*4,size, size,3), dtype = np.uint8)
-        img_output_3d = np.zeros((self.time_length*4,size, size), dtype = np.uint8)
+        size = 128
+        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
+        img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
 
 
 
@@ -277,7 +277,7 @@ class Stacker:
         i = 0
 
 
-        while i < self.time_length*4:
+        while i < self.time_length:
             ret, frame = cap.read()
             img_input_3d[i,:,:,:] = cv2.resize(frame, (size,size))
             temp =  output_mat['segm_{}'.format(i+1)]
@@ -293,12 +293,12 @@ class Stacker:
 
 
         img_output_3d =  distance_transform(img_output_3d, mode ='thresh-signed')
-        for i in range(16):
-            img_output_3d[i,:,:] = cv2.normalize(img_output_3d[i,:,:],  0, 255, cv2.NORM_MINMAX)
+        # for i in range(16):
+            # img_output_3d[i,:,:] = cv2.normalize(img_output_3d[i,:,:],  0, 255, cv2.NORM_MINMAX)
         # cv2.imshow('s',img_output_3d[0,:,:])
-        Visualizer_3D().visualize_3d_volume(img_output_3d)
+        # Visualizer_3D().visualize_3d_volume(img_output_3d)
         #
-        cv2.waitKey(0)
+        # cv2.waitKey(0)
         return img_output_3d, img_input_3d
 
 
@@ -361,15 +361,15 @@ class Stacker:
         """ Genereate Distance Transform from joints
             by creating thick skeletons
         """
-        size = 512
-        img_input_3d = np.zeros((self.time_length*4,size, size,3), dtype = np.uint8)
-        img_output_3d = np.zeros((self.time_length*4,size, size), dtype = np.uint8)
+        size = 128 * 2
+        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
+        img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
         i = 0
 
 
         inp = self.info['input'][frame_number]
         out = self.info['output'][frame_number]
-        while i < self.time_length*4:
+        while i < self.time_length:
             frame = cv2.imread(os.path.join(inp, '%06d.png'%(i)))
             # read uint16 and get R channel ->opencv channels BGR
             temp = cv2.imread(os.path.join(out, '%06d.png'%(i)))[:,:,2]
@@ -408,10 +408,62 @@ class Stacker:
         # for i in range(16*4):
         #     img_output_3d[i,:,:] = cv2.normalize(img_output_3d[i,:,:],  0, 255, cv2.NORM_MINMAX)
         # cv2.imshow('s',img_output_3d[0,:,:])
-        Visualizer_3D().visualize_3d_volume(img_output_3d)
+        # Visualizer_3D().visualize_3d_volume(img_output_3d)
 
-        cv2.waitKey(0)
+        # cv2.waitKey(0)
         # img_output_3d = np.stack((img_output_3d_img,img_output_3d_impl),axis = 3)
+        return img_output_3d, img_input_3d
+
+
+    def get_refresh_v2(self, frame_number, scale = 4):
+        """ Genereate Distance Transform from joints
+            by creating thick skeletons
+        """
+        size = 128 * 2
+        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
+        img_output_3d_inter = np.zeros((self.time_length * scale,size, size), dtype = np.uint8)
+        img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
+        i = 0
+
+
+        inp = self.info['input'][frame_number]
+        out = self.info['output'][frame_number]
+
+        x, y = random_crop(size)
+
+        while i < self.time_length:
+
+            frame = cv2.imread(os.path.join(inp, '%06d.png'%(i)))
+            # read uint16 and get R channel ->opencv channels BGR
+            temp = cv2.imread(os.path.join(out, '%06d.png'%(i)))[:,:,2]
+            # print(temp.shape)
+            # print(cv2.resize(frame, (size,size)).shape)
+
+            # img_input_3d[i ,:,:,:] = cv2.resize(frame, (size,size))
+            img_input_3d[i ,:,:,:] = frame[x:size+x, y:size+y,:]
+
+            #inside == 0, outside == 1
+            # temp = cv2.resize(temp, (size,size))
+            temp = temp[x:x+size, y:y+size]
+            f = temp == 255
+
+            temp = np.where(f, 0, 1)
+
+            img_output_3d_inter[i * scale,:,:] = temp
+
+
+            i +=1
+
+        img_output_3d_inter =  distance_transform(img_output_3d_inter, mode ='thresh-signed')
+        img_output_3d = img_output_3d_inter[0::scale,:,:]
+        # for i in range(0,self.time_length):
+        #     a = img_output_3d[i,:,:]
+        #     a = (a - 1.0) / -2.0 * 255.0
+        #     im_color = cv2.applyColorMap(np.uint8(a), cv2.COLORMAP_JET)
+        #     numpy_horizontal = np.hstack((im_color, img_input_3d[i,:,:,:]))
+        #     cv2.imshow('s',numpy_horizontal )
+        #     cv2.waitKey(0)
+        #
         return img_output_3d, img_input_3d
 
     def get_posetrack(self,  frame_number):
@@ -511,3 +563,45 @@ def LOG(X, f=None):
         print(time_stamp + " " + X)
     else:
         f.write(time_stamp + " " + X)
+
+
+def transparent_overlay(src, overlay):
+
+    color_contour = [0,255,0]
+    color_inside = [255,255,255]
+    overlay = overlay[:,:,0]
+
+    mid_bound = (np.max(overlay) - np.min(overlay)) / 2 + np.min(overlay)
+    upper_bound = 127# mid_bound + 0.01 * (np.max(overlay) - np.min(overlay))
+    lower_bound = 120#mid_bound - 0.01 * (np.max(overlay) - np.min(overlay))
+    ix_contour = np.logical_and(overlay < upper_bound , overlay >lower_bound)
+    ix_inside = overlay < 	lower_bound
+
+    ix_contour = np.stack([ix_contour,ix_contour,ix_contour], axis = 2)
+    ix_inside = np.stack([ix_inside,ix_inside,ix_inside], axis = 2)
+
+    alpha_contour = np.where(ix_contour, [1.0,1.0,1.0], [0.0,0.0,0.0])
+    alpha_inside = np.where(ix_inside,[0.5, 0.5,0.5],[0.0,0.0,0.0])
+
+
+    alpha = alpha_contour + alpha_inside
+
+
+    ov_contour = np.where(ix_contour, color_contour * alpha, [0.0,0.0,0.0])
+    ov_inside = np.where(ix_inside, color_inside * alpha, [0.0,0.0,0.0])
+    channels = ov_contour + ov_inside
+
+    idx = alpha  == 0.0
+    src = np.where(idx,src ,  channels + (1.0 - alpha) * src )
+
+
+    return np.uint8(src)
+
+
+def random_crop(size):
+    # random crop
+    np.random.seed(20)
+    x =  np.random.randint(low = 0, high = 480 - size - 1)
+    y =  np.random.randint(low = 0, high = 640 - size - 1)
+
+    return x, y

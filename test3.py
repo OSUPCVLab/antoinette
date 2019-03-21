@@ -28,6 +28,8 @@ from sklearn.metrics import auc
 EPOCHS = 1000
 
 
+
+
 def overlay(img, mask, alpha = 0.6):
     img_hsv = color.rgb2hsv(img)
     color_mask_hsv = color.rgb2hsv(mask)
@@ -102,8 +104,8 @@ def main():
 	time_length = 16
 	# train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length, 'TEST')
 	# train_lab, val_lab, test_lab = utils.prepare_data_synthia(os.path.join(base_dir , "Data\\SYNTHIA-SEQS-01-SUMMER"), time_length)
-	test_lab = utils.prepare_video(os.path.join(base_dir , "Data"), time_length, 'TEST')
-	# train_lab, val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
+	# test_lab = utils.prepare_video(os.path.join(base_dir , "Data"), time_length, 'TEST')
+	train_lab, val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
 	# train_lab, val_lab, test_lab = utils.prepare_data_posetrack(os.path.join(base_dir , "E:\\Datasets\\Nima\\PoseTrack\\images"), time_length)
 
 	config = tf.ConfigProto()
@@ -113,9 +115,9 @@ def main():
 	net_input =  tf.placeholder(tf.float32,shape=[None,time_length,None,None,3])
 	net_output = tf.placeholder(tf.float32,shape=[None,time_length,None,None,1])#,None,num_classes
 	net_normals = compute_normlas(net_output)
-	# network, network_normals = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
+	network, network_normals = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
 
-	network,_ = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
+	# network,_ = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
 	# loss = tf.reduce_mean(tf.nn.l2_loss(network- net_output))#softmax_cross_entropy_with_logits_v2(logits = network, labels = net_output)
 
 
@@ -146,11 +148,11 @@ def main():
 	# score=open("%s\\scores.csv"%("results"),'w')
 	# score.write("avg_accuracy, precision, recall, f1 score, mean iou\n" )
 	for ind in range(300):#0,len(test_lab['input'])
-		gt, input_image = stacks_test.get_video(ind)#get_data(ind)#stacks_test.get_refresh(ind)#
+		gt, input_image = stacks_test.get_refresh(ind)#get_data(ind)#stacks_test.get_refresh(ind)#
 		input_image = np.expand_dims(input_image,axis=0)
-		# output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
+		output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
 		# output_image, output_normals = sess.run([network, compute_normlas(network)], feed_dict = {net_input: input_image/255.0})
-		output_image = sess.run(network, feed_dict = {net_input: input_image/255.0})
+		# output_image = sess.run(network, feed_dict = {net_input: input_image/255.0})
 
 		# gt_temp = np.float32(np.expand_dims(gt, axis = 3))
 
@@ -239,8 +241,9 @@ def main():
 			# cv2.addWeighted(p, 0.7, input_image_i, 0.3,0, input_image_i)
 
 
-			img_stacked = mask_color_img(input_image_i, p,  color = [255,0,0], alpha = 0.6)
+			# img_stacked = mask_color_img(input_image_i, p,  color = [255,0,0], alpha = 0.6)
 
+			img_stacked = utils.transparent_overlay(input_image_i, output_image_i)
 			# cv2.addWeighted(p, 0.5, g, 0.5,0, g)
 			# cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s4_%04d_sub1.png"%("results",ind, file_name,i)),g)
 			cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s6_%04d_sub2.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(img_stacked))
