@@ -18,7 +18,7 @@ import os
 # use 'Agg' on matplotlib so that plots could be generated even without Xserver
 # running
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from sklearn.metrics import precision_score, \
@@ -101,7 +101,7 @@ def compute_normlas(inputs):
 def main():
 	base_dir = os.getcwd()
 
-	time_length = 16
+	time_length = 8
 	# train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length, 'TEST')
 	# train_lab, val_lab, test_lab = utils.prepare_data_synthia(os.path.join(base_dir , "Data\\SYNTHIA-SEQS-01-SUMMER"), time_length)
 	# test_lab = utils.prepare_video(os.path.join(base_dir , "Data"), time_length, 'TEST')
@@ -115,9 +115,9 @@ def main():
 	net_input =  tf.placeholder(tf.float32,shape=[None,time_length,None,None,3])
 	net_output = tf.placeholder(tf.float32,shape=[None,time_length,None,None,1])#,None,num_classes
 	net_normals = compute_normlas(net_output)
-	network, network_normals = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
+	# network, network_normals = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
 
-	# network,_ = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
+	network,_ = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
 	# loss = tf.reduce_mean(tf.nn.l2_loss(network- net_output))#softmax_cross_entropy_with_logits_v2(logits = network, labels = net_output)
 
 
@@ -145,17 +145,17 @@ def main():
 	per_seq_iou = []
     #
     #
-	# score=open("%s\\scores.csv"%("results"),'w')
-	# score.write("avg_accuracy, precision, recall, f1 score, mean iou\n" )
-	for ind in range(300):#0,len(test_lab['input'])
-		gt, input_image = stacks_test.get_refresh(ind)#get_data(ind)#stacks_test.get_refresh(ind)#
+	score=open("%s\\scores.csv"%("results"),'w')
+	score.write("avg_accuracy, precision, recall, f1 score, mean iou\n" )
+	for ind in range(0,len(test_lab['input'])):#
+		gt, input_image = stacks_test.get_refresh_v3(ind,3)#get_data(ind)#stacks_test.get_refresh(ind)#
 		input_image = np.expand_dims(input_image,axis=0)
-		output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
+		# output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
 		# output_image, output_normals = sess.run([network, compute_normlas(network)], feed_dict = {net_input: input_image/255.0})
-		# output_image = sess.run(network, feed_dict = {net_input: input_image/255.0})
+		output_image = sess.run(network, feed_dict = {net_input: input_image/255.0})
 
 		# gt_temp = np.float32(np.expand_dims(gt, axis = 3))
-
+#
 		# gt_normals = sess.run(net_normals, feed_dict = {net_output: [gt_temp]})
 
 		output_image = np.array(output_image[0,:,:,:])
@@ -167,9 +167,9 @@ def main():
 			os.makedirs(os.path.join(base_dir , "%s\\%04d"%("results",ind)))
 
 		# SAVE scors
-		# target=open("%s\\%04d\\val_scores.csv"%("results",ind),'w')
-		# target.write("val_name, avg_accuracy, precision, recall, f1 score, mean iou\n" )
-        #
+		target=open("%s\\%04d\\val_scores.csv"%("results",ind),'w')
+		target.write("val_name, avg_accuracy, precision, recall, f1 score, mean iou\n" )
+
 
 
 
@@ -182,37 +182,72 @@ def main():
 
 		for i in range(time_length):
 			# gt_i = gt[i,:,:]*255.0
-			output_image_i = output_image[i,:,:]*255.0
+			# output_image_i = output_image[i,:,:]*255.0
+
+			gt_i = gt[i,:,:]
+			gt_i_color = (gt_i - 1.0) / -2.0
+			gt_i_color = cv2.applyColorMap(np.uint8(gt_i_color*255.0), cv2.COLORMAP_JET)
+
+			output_image_i = output_image[i,:,:]
+			output_image_color = (output_image_i - 1.0) / -2.0
+
+			output_image_color = cv2.applyColorMap(np.uint8(output_image_color*255.0), cv2.COLORMAP_JET)
 
 			input_image_i = input_image[0,i,:,:,:]
 
-			# gt_normals_i = gt_normals[0,i,:,:,:]*255.0
-			# output_normals_i = output_normals[0,i,:,:,:]*255.0
+
+            #
+			# output_normals_i = output_normals[0,i,:,:,:]
+			# output_normals_l2_norm = np.linalg.norm(output_normals_i,axis = 2) + 1e-12
+			# output_normals_i[:,:,0] /= output_normals_l2_norm
+			# output_normals_i[:,:,1] /= output_normals_l2_norm
+			# output_normals_i[:,:,2] /= output_normals_l2_norm
+			# output_normals_i = (output_normals_i + 1.0) * 0.5 * 255.0
+            #
+			# gt_normals_i = gt_normals[0,i,:,:,:]
+			# gt_normals_l2_norm = np.linalg.norm(gt_normals_i,axis = 2) + 1e-12
+			# gt_normals_i[:,:,0] /= gt_normals_l2_norm
+			# gt_normals_i[:,:,1] /= gt_normals_l2_norm
+			# gt_normals_i[:,:,2] /= gt_normals_l2_norm
+			# gt_normals_i = (gt_normals_i + 1.0) * 0.5 * 255.0
 
 			file_name = os.path.basename(test_lab['input'][0])#[ind][0])
 			file_name = os.path.splitext(file_name)[0]
 
-			cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s1_%04d_pred.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(output_image_i))
-			# cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s2_%04d_gt.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(gt_i))
+			cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s1_%04d_pred.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(output_image_color))
+			cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s2_%04d_gt.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(gt_i_color))
 			cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s3_%04d_gt_img.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(input_image_i))
 			# cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s4_%04d_gt_normal.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(gt_normals_i))
 			# cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s5_%04d_pred_normal.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(output_normals_i))
 			# p = np.logical_and(output_image_i < 10 , output_image_i > -10)
+			print('new')
+			print(np.max(output_image_i), np.min(output_image_i))
+			print(np.max(gt_i), np.min(gt_i))
 
-			p =  output_image_i < 255/2
-			# g = gt_i < 125
-			# flat_pred = p.flatten()
-			# flat_label = g.flatten()
-			# score_averaging = 'weighted'
-			# prec = precision_score(flat_label, flat_pred, average=score_averaging)
-			# rec = recall_score(flat_label, flat_pred, average=score_averaging)
-			# f1 = f1_score(flat_label, flat_pred, average=score_averaging)
-            # #
-			# tn, fp, fn, tp = confusion_matrix(flat_label, flat_pred).ravel()
-			# accuracy = (tp + tn) / (tp + fp + fn + tn)
-			# iou =  tp / (tp + fp +fn)
+			p =  output_image_i < 0.01
+			g = gt_i < 0.01
+			flat_pred = p.flatten()
+			flat_label = g.flatten()
+			score_averaging = 'weighted'
+			prec = precision_score(flat_label, flat_pred, average=score_averaging)
+			rec = recall_score(flat_label, flat_pred, average=score_averaging)
+			f1 = f1_score(flat_label, flat_pred, average=score_averaging)
             #
-			# # Compute Precision-Recall and plot curve
+
+
+			arg = confusion_matrix(flat_label, flat_pred).ravel()
+			if (len(arg) != 1):
+				tn, fp, fn, tp = arg
+				accuracy = (tp + tn) / (tp + fp + fn + tn)
+				iou =  tp / (tp + fp +fn)
+			else:
+				print("Not enough info")
+				accuracy = np.nan
+				iou =np.nan
+
+
+
+			# Compute Precision-Recall and plot curve
 			# precision, recall, thresholds = precision_recall_curve(flat_pred, flat_label )
 			# area = auc(recall, precision)
 			# print("Area Under Curve: %0.2f" % area)
@@ -227,11 +262,11 @@ def main():
 			# plt.legend(loc="lower left")
 			# plt.show()
 
-			# per_img_acc.append(accuracy)
-			# per_img_prec.append(prec)
-			# per_img_rec.append(rec)
-			# per_img_f1.append(f1)
-			# per_img_iou.append(iou)
+			per_img_acc.append(accuracy)
+			per_img_prec.append(prec)
+			per_img_rec.append(rec)
+			per_img_f1.append(f1)
+			per_img_iou.append(iou)
 
 
 			# g = np.expand_dims(gt_i,axis=2) == 0
@@ -243,12 +278,15 @@ def main():
 
 			# img_stacked = mask_color_img(input_image_i, p,  color = [255,0,0], alpha = 0.6)
 
-			img_stacked = utils.transparent_overlay(input_image_i, output_image_i)
+			# img_stacked = utils.transparent_overlay(input_image_i, output_image_i)
+
+			contour_lab = os.path.join(base_dir ,"%s\\%04d\\%s6_%04d_sub2.png"%("results",ind, file_name,i+ind*time_length))
+			utils.interpolated_contour(input_image_i, output_image_i, contour_lab )
 			# cv2.addWeighted(p, 0.5, g, 0.5,0, g)
 			# cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s4_%04d_sub1.png"%("results",ind, file_name,i)),g)
-			cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s6_%04d_sub2.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(img_stacked))
-
-    # #
+	# 		cv2.imwrite(os.path.join(base_dir ,"%s\\%04d\\%s6_%04d_sub2.png"%("results",ind, file_name,i+ind*time_length)),np.uint8(img_stacked))
+    #
+    #
 	# 		target.write("%f, %f, %f, %f, %f, %f\n"%(ind, accuracy, prec, rec, f1, iou))
 	# 	target.close()
 	# 	per_seq_acc.append(np.mean(per_img_acc))
@@ -257,7 +295,9 @@ def main():
 	# 	per_seq_f1.append(np.mean(per_img_f1))
 	# 	per_seq_iou.append(np.mean(per_img_iou))
     #
-	# 	score.write("%f, %f, %f, %f, %f\n"%(np.mean(per_img_acc), np.mean(per_img_prec), np.mean(per_img_rec), np.mean(per_img_f1), np.mean(per_img_iou)))
+	# 	score.write("%f, %f, %f, %f, %f\n"%(np.nanmean(per_img_acc), np.nanmean(per_img_prec),\
+    #                                         np.nanmean(per_img_rec), np.nanmean(per_img_f1),\
+    #                                          np.nanmean(per_img_iou)))
 	# score.close()
 
 

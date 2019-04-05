@@ -81,7 +81,7 @@ class Stacker:
             temp = cv2.imread(os.path.join(out, '%06d.png'%(i)))[:,:,2]
             # print(temp.shape)
             # print(cv2.resize(frame, (size,size)).shape)
-        
+
             img_input_3d[i ,:,:,:] = cv2.resize(frame, (size,size))
 
             #inside == 0, outside == 1
@@ -97,13 +97,7 @@ class Stacker:
 
         img_output_3d_inter =  distance_transform(img_output_3d_inter, mode ='thresh-signed')
         img_output_3d = img_output_3d_inter[0::scale,:,:]
-        for i in range(0,self.time_length):
-            a = img_output_3d[i,:,:]
-            a = (a - 1.0) / -2.0 * 255.0
-            im_color = cv2.applyColorMap(np.uint8(a), cv2.COLORMAP_JET)
-            numpy_horizontal = np.hstack((im_color, img_input_3d[i,:,:,:]))
-            cv2.imshow('s',numpy_horizontal )
-            cv2.waitKey(0)
+
 
         return img_output_3d, img_input_3d
 
@@ -113,4 +107,32 @@ time_length = 16
 base_dir = os.getcwd()
 train_lab = prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
 stacks_train = Stacker(train_lab, time_length)
-img_output, img_input = stacks_train.get_refresh(250, 3)
+img_output_1, img_input = stacks_train.get_refresh(250,1)
+img_output_3, _ = stacks_train.get_refresh(250, 3)
+img_output_10, _ = stacks_train.get_refresh(250, 10)
+cap = cv2.VideoCapture(0)
+
+# Define the codec and create VideoWriter object
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+out = cv2.VideoWriter("C:\\Users\\ajamgard.1\\Box\\Publications\\Materials\\timeDilation\\output.mp4",fourcc, 5.0, (512*4,512))
+for i in range(0,time_length):
+    a = img_output_1[i,:,:]
+    a = (a - 1.0) / -2.0 * 255.0
+    im_color_1 = cv2.applyColorMap(np.uint8(a), cv2.COLORMAP_JET)
+    b = img_output_3[i,:,:]
+    b = (b - 1.0) / -2.0 * 255.0
+    im_color_3 = cv2.applyColorMap(np.uint8(b), cv2.COLORMAP_JET)
+    c = img_output_10[i,:,:]
+    c = (c - 1.0) / -2.0 * 255.0
+    im_color_10 = cv2.applyColorMap(np.uint8(c), cv2.COLORMAP_JET)
+    numpy_horizontal = np.hstack((im_color_1,im_color_3, im_color_10, img_input[i,:,:,:]))
+    # cv2.imshow('s',numpy_horizontal )
+    cv2.imwrite("C:\\Users\\ajamgard.1\\Box\\Publications\\Materials\\timeDilation\\Img-%04d.png"%i,img_input[i,:,:,:] )
+    cv2.imwrite("C:\\Users\\ajamgard.1\\Box\\Publications\\Materials\\timeDilation\\T1-%04d.png"%i,im_color_1 )
+    cv2.imwrite("C:\\Users\\ajamgard.1\\Box\\Publications\\Materials\\timeDilation\\T3-%04d.png"%i,im_color_3 )
+    cv2.imwrite("C:\\Users\\ajamgard.1\\Box\\Publications\\Materials\\timeDilation\\T10-%04d.png"%i,im_color_10 )
+
+    # cv2.waitKey(0)
+    # out.write(numpy_horizontal)
+# out.release()
+cv2.destroyAllWindows()

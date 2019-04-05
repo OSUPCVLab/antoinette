@@ -21,7 +21,14 @@ import matplotlib.pyplot as plt
 
 import random
 import ntpath
+from skimage import measure
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+import PIL
 
+from matplotlib import colors as mcolors
 from utils.vtk_utils import *
 
 # import tf
@@ -210,7 +217,7 @@ def distance_transform( vol, mode ='unsigned'):
         img_output_3d = ndimage.distance_transform_edt(vol)
         inside = vol == 0.0
         temp = ndimage.distance_transform_edt(1 - vol)
-        img_output_3d = np.where(inside,np.maximum(-temp,-10), np.minimum(img_output_3d,10))
+        img_output_3d = np.where(inside,np.maximum(-temp,-200), np.minimum(img_output_3d,200))
         img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d)+ eps)
         # np.savetxt('C:\\Users\\ajamgard.1\\Desktop\\TemporalPose\\tx.txt',img_output_3d[0,:,:], delimiter=',')
         img_output_3d = img_output_3d * 2.0 - 1.0
@@ -314,8 +321,10 @@ class Stacker:
         ii = 0
         while i < self.time_length:
             ret, frame = cap.read()
+            h, w = frame.shape[:2]
             if ii >= frame_number*(self.time_length-1):
-                img_input_3d[i,:,:,:] = cv2.resize(frame, (size,size))
+                # img_input_3d[i,:,:,:] = cv2.resize(frame, (size,size))
+                img_input_3d[i,:,:,:] = frame[h//2 - size//2:h//2 + size//2,w//2 - size//2:w//2 + size//2,]
                 i += 1
             ii += 1
         cap.release()
@@ -361,7 +370,7 @@ class Stacker:
         """ Genereate Distance Transform from joints
             by creating thick skeletons
         """
-        size = 128 * 2
+        size = 128
         img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
         img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
         i = 0
@@ -419,7 +428,7 @@ class Stacker:
         """ Genereate Distance Transform from joints
             by creating thick skeletons
         """
-        size = 128 * 2
+        size = 128
         img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
         img_output_3d_inter = np.zeros((self.time_length * scale,size, size), dtype = np.uint8)
         img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
@@ -445,6 +454,58 @@ class Stacker:
             #inside == 0, outside == 1
             # temp = cv2.resize(temp, (size,size))
             temp = temp[x:x+size, y:y+size]
+            f = temp == 255
+
+            temp = np.where(f, 0, 1)
+
+            img_output_3d_inter[i * scale,:,:] = temp
+
+
+            i +=1
+
+        img_output_3d_inter =  distance_transform(img_output_3d_inter, mode ='thresh-signed')
+        img_output_3d = img_output_3d_inter[0::scale,:,:]
+        # for i in range(0,self.time_length):
+        #     a = img_output_3d[i,:,:]
+        #     a = (a - 1.0) / -2.0 * 255.0
+        #     im_color = cv2.applyColorMap(np.uint8(a), cv2.COLORMAP_JET)
+        #     numpy_horizontal = np.hstack((im_color, img_input_3d[i,:,:,:]))
+        #     cv2.imshow('s',numpy_horizontal )
+        #     cv2.waitKey(0)
+        #
+        return img_output_3d, img_input_3d
+
+
+    def get_refresh_v3(self, frame_number, scale = 4):
+        """ Genereate Distance Transform from joints
+            by creating thick skeletons
+        """
+        size = 128
+        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
+        img_output_3d_inter = np.zeros((self.time_length * scale,size, size), dtype = np.uint8)
+        img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
+        i = 0
+
+
+        inp = self.info['input'][frame_number]
+        out = self.info['output'][frame_number]
+
+
+
+        while i < self.time_length:
+
+            frame = cv2.imread(os.path.join(inp, '%06d.png'%(i)))
+            # read uint16 and get R channel ->opencv channels BGR
+            temp = cv2.imread(os.path.join(out, '%06d.png'%(i)))[:,:,2]
+            # print(temp.shape)
+            # print(cv2.resize(frame, (size,size)).shape)
+
+            img_input_3d[i ,:,:,:] = cv2.resize(frame[:,:480], (size,size))
+
+
+            #inside == 0, outside == 1
+            temp = temp[:, :480]
+            temp = cv2.resize(temp, (size,size))
             f = temp == 255
 
             temp = np.where(f, 0, 1)
@@ -567,40 +628,145 @@ def LOG(X, f=None):
 
 def transparent_overlay(src, overlay):
 
-    color_contour = [0,255,0]
-    color_inside = [255,255,255]
+	color_contour = [0,255,0]
+	color_inside = [255,0,0]
+	overlay = overlay[:,:,0]
+	# print(np.max(overlay),np.min(overlay))
+	mid_bound = (np.max(overlay) - np.min(overlay)) / 2 + np.min(overlay)
+	upper_bound = 0.90# mid_bound + 0.01 * (np.max(overlay) - np.min(overlay))#127#
+	lower_bound = 0.70 #mid_bound - 0.01 * (np.max(overlay) - np.min(overlay))#120#
+	ix_contour = np.logical_and(overlay < upper_bound , overlay >lower_bound)
+	ix_inside = overlay < 	lower_bound
+
+	ix_contour = np.stack([ix_contour,ix_contour,ix_contour], axis = 2)
+	ix_inside = np.stack([ix_inside,ix_inside,ix_inside], axis = 2)
+
+	alpha_contour = np.where(ix_contour, [1.0,1.0,1.0], [0.0,0.0,0.0])
+	alpha_inside = np.where(ix_inside,[0.5, 0.5,0.5],[0.0,0.0,0.0])
+
+
+	alpha = alpha_contour + alpha_inside
+
+
+	ov_contour = np.where(ix_contour, color_contour * alpha, [0.0,0.0,0.0])
+	ov_inside = np.where(ix_inside, color_inside * alpha, [0.0,0.0,0.0])
+	channels = ov_contour + ov_inside
+
+	idx = alpha  == 0.0
+	src = np.where(idx,src ,  channels + (1.0 - alpha) * src )
+
+
+
+	ax.axis('image')
+	ax.set_xticks([])
+	ax.set_yticks([])
+	plt.show()
+
+	return np.uint8(src)
+
+
+def interpolated_contour(src, overlay, lab):
+
+    bound = 0.90
+    color = 'skyblue'
+    color_inside = mcolors.to_rgba(color)[:3]
+    color_inside = [int(c * 255.0) for c in color_inside][::-1]
+    # color_inside = [1.0, 0.7529411764705882, 0.796078431372549]#[135,206,235]
     overlay = overlay[:,:,0]
-
-    mid_bound = (np.max(overlay) - np.min(overlay)) / 2 + np.min(overlay)
-    upper_bound = 127# mid_bound + 0.01 * (np.max(overlay) - np.min(overlay))
-    lower_bound = 120#mid_bound - 0.01 * (np.max(overlay) - np.min(overlay))
-    ix_contour = np.logical_and(overlay < upper_bound , overlay >lower_bound)
-    ix_inside = overlay < 	lower_bound
-
-    ix_contour = np.stack([ix_contour,ix_contour,ix_contour], axis = 2)
+    ix_inside = overlay < 	bound
     ix_inside = np.stack([ix_inside,ix_inside,ix_inside], axis = 2)
 
-    alpha_contour = np.where(ix_contour, [1.0,1.0,1.0], [0.0,0.0,0.0])
-    alpha_inside = np.where(ix_inside,[0.5, 0.5,0.5],[0.0,0.0,0.0])
+    alpha = np.where(ix_inside,[0.5, 0.5,0.5],[0.0,0.0,0.0])
 
-
-    alpha = alpha_contour + alpha_inside
-
-
-    ov_contour = np.where(ix_contour, color_contour * alpha, [0.0,0.0,0.0])
     ov_inside = np.where(ix_inside, color_inside * alpha, [0.0,0.0,0.0])
-    channels = ov_contour + ov_inside
+    channels =  ov_inside
 
     idx = alpha  == 0.0
     src = np.where(idx,src ,  channels + (1.0 - alpha) * src )
 
 
-    return np.uint8(src)
+    contours = measure.find_contours(overlay, bound)
+
+    # Display the image and plot all contours found
+    # h, w = np.shape(src)[:2]
+    # my_dpi = 100
+
+    fig, ax = plt.subplots()
+
+    ax.imshow(np.uint8(src[:,:,::-1]))
+
+    for n, contour in enumerate(contours):
+        ax.plot(contour[:, 1], contour[:, 0], linewidth=2, color='lime')
+
+
+    ax.axis('image')
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    plt.savefig(lab, bbox_inches='tight')
+    # im = fig2img(fig)
+    # im.save(lab)
+
+def fig2data ( fig ):
+    """
+    @brief Convert a Matplotlib figure to a 4D numpy array with RGBA channels and return it
+    @param fig a matplotlib figure
+    @return a numpy 3D array of RGBA values
+    """
+    # draw the renderer
+    fig.canvas.draw ( )
+
+    # Get the RGBA buffer from the figure
+    w,h = fig.canvas.get_width_height()
+    buf = np.fromstring ( fig.canvas.tostring_argb(), dtype=np.uint8 )
+    buf.shape = ( w, h,4 )
+
+    # canvas.tostring_argb give pixmap in ARGB mode. Roll the ALPHA channel to have it in RGBA mode
+    buf = np.roll ( buf, 3, axis = 2 )
+    return buf
+
+
+
+def fig2img ( fig ):
+    """
+    @brief Convert a Matplotlib figure to a PIL Image in RGBA format and return it
+    @param fig a matplotlib figure
+    @return a Python Imaging Library ( PIL ) image
+    """
+    # put the figure pixmap into a numpy array
+    buf = fig2data ( fig )
+    w, h, d = buf.shape
+    return PIL.Image.frombytes( "RGBA", ( w ,h ), buf.tostring( ) )
+
+
+
+
+def region(image, label):
+    ### TODO ###
+	# label image regions
+	label_image = label(label[:,:,0])
+	image_label_overlay = label2rgb(label_image, image=image)
+
+	fig, ax = plt.subplots(figsize=(10, 6))
+	ax.imshow(image_label_overlay)
+
+	for region in regionprops(label_image):
+		# take regions with large enough areas
+		if region.area >= 100:
+			# draw rectangle around segmented coins
+			minr, minc, maxr, maxc = region.bbox
+			rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr,
+									  fill=False, edgecolor='red', linewidth=2)
+
+
+	ax.set_axis_off()
+	plt.tight_layout()
+	plt.show()
 
 
 def random_crop(size):
     # random crop
-    np.random.seed(20)
+    np.random.seed(16)
     x =  np.random.randint(low = 0, high = 480 - size - 1)
     y =  np.random.randint(low = 0, high = 640 - size - 1)
 

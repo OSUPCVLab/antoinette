@@ -29,9 +29,9 @@ def compute_normlas(inputs):
 	# dx = tf.layers.conv3d(inputs, 1, (3,1,1), strides =(1,1,1), activation=None , padding = 'same')
 	# dy = tf.layers.conv3d(inputs, 1, (1,3,1), strides =(1,1,1), activation=None , padding = 'same')
 	# dz = tf.layers.conv3d(inputs, 1, (1,1,3), strides =(1,1,1), activation=None , padding = 'same')
-	h = [0.5,0.,-0.5]
-	w = [0.5,0.,-0.5]
-	t = [0.5,0.,-0.5]
+	h = [-0.5,0.,0.5]
+	w = [-0.5,0.,0.5]
+	t = [-0.5,0.,0.5]
 	tt, hh, ww = np.meshgrid(t,h,w,indexing='ij')
 	tt = np.expand_dims(tt, axis = 3)
 	tt = np.expand_dims(tt, axis = 4)
@@ -49,14 +49,16 @@ def compute_normlas(inputs):
 	dw = tf.nn.conv3d(inputs, ww, strides=[1,1,1,1,1], padding='SAME', name ='convW')
 	normals = tf.concat([dt, dh, dw],4)
 
-    # normalizing causes loss to go nan!!!!
-	#norm = tf.norm(normals, axis = 4, keepdims=True) + 1e-15
-	#dt /= norm
-	#dh /= norm
-	#dw /= norm
 
-	#normals = tf.concat([dt, dh, dw],4)
+	# norm = tf.norm(normals, axis = 4, keepdims = True) + 1e-12
+	# #
+	# dt /= norm
+	# dh /= norm
+	# dw /= norm
 
+	#
+	# normals = tf.concat([dt, dh, dw],4)
+	# normals = (normals + 1.0) /2.0
 	return normals
 
 def combined_loss(net,output):
@@ -73,7 +75,7 @@ def combined_loss(net,output):
 def main():
 	base_dir = os.getcwd()
 
-	time_length = 4
+	time_length = 8
 	# train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length,mode = 'TRAIN')
 	train_lab, val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
 
@@ -130,6 +132,8 @@ def main():
 
 	batch_size  = 2
 	label_values = []
+
+	best_loss = 1e15;
 	with sess.as_default():
 		start = global_step.eval()
 		fig2, ax2 = plt.subplots(figsize=(11, 8))
@@ -150,7 +154,7 @@ def main():
 				# Collect a batch of images
 				for j in range(batch_size):
 					index = i* batch_size + j
-					img_output, img_input = stacks_train.get_refresh_v2(index, 3)
+					img_output, img_input = stacks_train.get_refresh_v3(index, 5)
 
 					with tf.device('/cpu:0'):
 
@@ -188,9 +192,12 @@ def main():
 			if not os.path.isdir(os.path.join(base_dir , "%s\\%04d"%("checkpoints",epoch))):
 				os.makedirs(os.path.join(base_dir , "%s\\%04d"%("checkpoints",epoch)))
 
-			# Save latest checkpoint to same file name
-			print("Saving latest checkpoint")
-			saver.save(sess,model_checkpoint_name)
+			if best_loss > mean_loss:
+				best_loss = mean_loss
+				# Save latest checkpoint to same file name
+				print("Saving latest checkpoint")
+				saver.save(sess,model_checkpoint_name)
+
 			global_step.assign(epoch).eval()
 
 			if val_indices != 0 and epoch % 5 == 0:
@@ -211,7 +218,7 @@ def main():
 
 				# Do the validation on a small set of validation images
 				for ind in val_indices:
-					gt, input_image= stacks_val.get_refresh_v2(ind, 3)
+					gt, input_image= stacks_val.get_refresh_v3(ind, 5)
 					input_image = np.expand_dims(input_image,axis=0)
 					output_image, output_normals = sess.run([network,compute_normlas(network)], feed_dict = {net_input: input_image/255.0})
 					# output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
@@ -222,14 +229,31 @@ def main():
 					gt_normals = sess.run(net_normals, feed_dict = {net_output: [gt_temp]})
 					# output_normals = sess.run(compute_normlas(output_image))
 
+
+					gt = gt[time_length-1,:,:]
+					gt = (gt - 1.0) / -2.0 * 255.0
+					gt = cv2.applyColorMap(np.uint8(gt), cv2.COLORMAP_JET)
+
 					output_image = np.array(output_image[0,:,:,:])
-					gt = gt[time_length-1,:,:]*255.0
-					output_image = output_image[time_length-1,:,:]*255.0
+					output_image = output_image[time_length-1,:,:]
+					output_image = (output_image - 1.0) / -2.0 * 255.0
+					output_image = cv2.applyColorMap(np.uint8(output_image), cv2.COLORMAP_JET)
 
 					input_image = input_image[0,time_length-1,:,:,:]
 
-					output_normals = output_normals[0,time_length-1,:,:,:]*255.0
-					gt_normals = gt_normals[0,time_length-1,:,:,:]*255.0
+					output_normals = output_normals[0,time_length-1,:,:,:]
+					output_normals_l2_norm = np.linalg.norm(output_normals,axis = 2) + 1e-12
+					output_normals[:,:,0] /= output_normals_l2_norm
+					output_normals[:,:,1] /= output_normals_l2_norm
+					output_normals[:,:,2] /= output_normals_l2_norm
+					output_normals = (output_normals + 1.0) * 0.5 * 255.0
+
+					gt_normals = gt_normals[0,time_length-1,:,:,:]
+					gt_normals_l2_norm = np.linalg.norm(gt_normals,axis = 2) + 1e-12
+					gt_normals[:,:,0] /= gt_normals_l2_norm
+					gt_normals[:,:,1] /= gt_normals_l2_norm
+					gt_normals[:,:,2] /= gt_normals_l2_norm
+					gt_normals = (gt_normals + 1.0) * 0.5 * 255.0
 					# file_name = utils.filepath_to_name(filenames_val[ind][0])
 
 

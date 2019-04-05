@@ -29,7 +29,7 @@ def distance_transform( vol, mode ='unsigned'):
         img_output_3d = ndimage.distance_transform_edt(vol)
         inside = vol == 0.0
         temp = ndimage.distance_transform_edt(1 - vol)
-        img_output_3d = np.where(inside,np.maximum(-temp,-10), np.minimum(img_output_3d,10))
+        img_output_3d = np.where(inside,np.maximum(-temp,-1000000), np.minimum(img_output_3d,1000000))
         img_output_3d = (img_output_3d - (np.min(img_output_3d))) / (np.max(img_output_3d) - np.min(img_output_3d)+ eps)
         # np.savetxt('C:\\Users\\ajamgard.1\\Desktop\\TemporalPose\\tx.txt',img_output_3d[0,:,:], delimiter=',')
         img_output_3d = img_output_3d * 2.0 - 1.0
@@ -115,11 +115,12 @@ def transparentOverlay(src , overlay , pos=(0,0),scale = 1):
 
 # read all images
 
-bImg = cv2.imread("foreground.jpg")
+# bImg = cv2.imread("foreground.jpg")
+img = cv2.imread('C:\\Users\\ajamgard.1\\Box\\Publications\\Materials\\binary-sdf\\000062.png')
 
 
 # KeyPoint : Remember to use cv2.IMREAD_UNCHANGED flag to load the image with alpha channel
-logoImage = np.zeros((bImg.shape[0],bImg.shape[1]), dtype = np.uint8)
+# logoImage = np.zeros((bImg.shape[0],bImg.shape[1]), dtype = np.uint8)
 # logoImage[10:150, 10:150] = 1#[0,0,0, 100]
 # logoImage[10:150, 10:12, :] = [0,255,255, 255]
 # logoImage[10:12, 10:150, :] = [0,255,255, 255]
@@ -127,27 +128,28 @@ logoImage = np.zeros((bImg.shape[0],bImg.shape[1]), dtype = np.uint8)
 # logoImage[0:150, 148:150, :] = [0,255,255, 255]
 
 
-x = np.arange(0, bImg.shape[0])
-y = np.arange(0, bImg.shape[1])
+# x = np.arange(0, bImg.shape[0])
+# y = np.arange(0, bImg.shape[1])
+#
+#
+# for i in range(len(x)):
+# 	for j in range(len(y)):
+# 			if (i - len(x)/2)**2 + (j - len(y)/2)**2  - 1000 <= 0:
+# 				logoImage[i,j] = 255
 
 
-for i in range(len(x)):
-	for j in range(len(y)):
-			if (i - len(x)/2)**2 + (j - len(y)/2)**2  - 1000 <= 0:
-				logoImage[i,j] = 255
+out = distance_transform(img, mode = 'thresh-signed')
+out = (out - 1.0) / -2.0 * 255.0
+out = cv2.applyColorMap(np.uint8(out), cv2.COLORMAP_JET)
+# result = transparentOverlay(bImg,out,(0,0), 1 )
 
-
-out = distance_transform(logoImage, mode = 'thresh-signed')
-
-result = transparentOverlay(bImg,out,(0,0), 1 )
-
-
+cv2.imwrite('C:\\Users\\ajamgard.1\\Box\\Publications\\Materials\\binary-sdf\\sdf.png', out)
 
 #Display the result
 
 cv2.namedWindow("Result")
 
-cv2.imshow("Result",result)
+cv2.imshow("Result",out)
 
 cv2.waitKey()
 
