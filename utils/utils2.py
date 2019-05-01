@@ -18,10 +18,13 @@ from sklearn.metrics import precision_score, \
 from scipy import ndimage
 import scipy.io as sio
 import matplotlib.pyplot as plt
-
+import matplotlib.patheffects as pe
 import random
 import ntpath
 from skimage import measure
+from skimage.segmentation import clear_border
+from skimage.measure import label, regionprops
+
 try:
     from StringIO import StringIO
 except ImportError:
@@ -668,12 +671,35 @@ def transparent_overlay(src, overlay):
 def interpolated_contour(src, overlay, lab):
 
     bound = 0.90
+
     color = 'skyblue'
     color_inside = mcolors.to_rgba(color)[:3]
     color_inside = [int(c * 255.0) for c in color_inside][::-1]
     # color_inside = [1.0, 0.7529411764705882, 0.796078431372549]#[135,206,235]
     overlay = overlay[:,:,0]
     ix_inside = overlay < 	bound
+
+    # extract regions
+    binary = overlay< bound
+
+    cleared = clear_border(binary)
+    # ax.imshow(np.uint8(cleared))
+    # plt.show()
+    label_image = label(cleared)
+    areas = [r.area for r in regionprops(label_image)]
+    areas.sort()
+    coords = []
+    if len(areas) > 2:
+        for region in regionprops(label_image):
+            # centroid = region.centroid
+            if region.area < 150:
+                overlay[region.coords[:,0],region.coords[:,1]] = 1
+                ix_inside[region.coords[:,0],region.coords[:,1]] = 0
+                #   ax.text(int(centroid[1]), int(centroid[0]), '%4d'%region.area, {'color': 'k', 'fontsize': 10, 'ha': 'center', 'va': 'center',
+                # 'bbox': dict(boxstyle="round", fc="w", ec="k", pad=0.2)})
+
+
+
     ix_inside = np.stack([ix_inside,ix_inside,ix_inside], axis = 2)
 
     alpha = np.where(ix_inside,[0.5, 0.5,0.5],[0.0,0.0,0.0])
@@ -682,21 +708,27 @@ def interpolated_contour(src, overlay, lab):
     channels =  ov_inside
 
     idx = alpha  == 0.0
+
+    fig, ax = plt.subplots()
+
+
+
+
     src = np.where(idx,src ,  channels + (1.0 - alpha) * src )
 
 
-    contours = measure.find_contours(overlay, bound)
+    contours = measure.find_contours(overlay, bound,positive_orientation = 'high')
 
     # Display the image and plot all contours found
     # h, w = np.shape(src)[:2]
     # my_dpi = 100
 
-    fig, ax = plt.subplots()
+
 
     ax.imshow(np.uint8(src[:,:,::-1]))
 
     for n, contour in enumerate(contours):
-        ax.plot(contour[:, 1], contour[:, 0], linewidth=2, color='lime')
+        ax.plot(contour[:, 1], contour[:, 0], color='lime', lw = 2, path_effects=[pe.Stroke(linewidth=4, foreground='navy'),pe.Normal()])#linewidth=2, color='lime')
 
 
     ax.axis('image')
@@ -706,6 +738,8 @@ def interpolated_contour(src, overlay, lab):
     plt.savefig(lab, bbox_inches='tight')
     # im = fig2img(fig)
     # im.save(lab)
+
+
 
 def fig2data ( fig ):
     """
