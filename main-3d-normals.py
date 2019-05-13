@@ -114,7 +114,7 @@ def main():
 	sess.run(tf.global_variables_initializer())
 
 	model_checkpoint_name = os.path.join(base_dir , "checkpoints\\latest_model_EncoderDecoder.ckpt")
-	# saver.restore(sess, model_checkpoint_name)
+	saver.restore(sess, model_checkpoint_name)
 	avg_loss_per_epoch = []
 	avg_scores_per_epoch = []
 	avg_iou_per_epoch = []
@@ -128,12 +128,16 @@ def main():
 	val_indices=random.sample(range(0,len(val_lab['input'])),num_vals)
 
 	stacks_train = utils.Stacker(train_lab, time_length)
-	stacks_val = utils.Stacker(val_lab, time_length)
+	train_mean, train_std = stacks_train.preprocess()
+	print(train_mean)
+	print(train_std)
+	stacks_val = utils.Stacker(val_lab, time_length, train_mean, train_std)
 
 	batch_size  = 2
 	label_values = []
 
 	best_loss = 1e15;
+	total_number_of_input = len(stacks_train.info['input'])
 	with sess.as_default():
 		start = global_step.eval()
 		fig2, ax2 = plt.subplots(figsize=(11, 8))
@@ -143,7 +147,7 @@ def main():
 			st = time.time()
 			epoch_st=time.time()
 
-			num_iters = range(int(np.floor(len(stacks_train.info['input']) / batch_size)))
+			num_iters = range(int(np.floor(total_number_of_input / batch_size)))
 			num_iters = np.random.permutation(num_iters)
 			for i in num_iters:
 				# st=time.time()
@@ -154,11 +158,11 @@ def main():
 				# Collect a batch of images
 				for j in range(batch_size):
 					index = i* batch_size + j
-					img_output, img_input = stacks_train.get_refresh_v3(index, 5)
+					img_output, img_input = stacks_train.get_refresh_v3(index, 3)
 
 					with tf.device('/cpu:0'):
 
-						img_input = np.float32(img_input) / 255.0
+						img_input = np.float32(img_input) #/ 255.0
 						input_image_batch.append(np.expand_dims(img_input, axis = 0))
 
 						# img_output = np.float32(helpers.onehot(img_output))
@@ -218,9 +222,10 @@ def main():
 
 				# Do the validation on a small set of validation images
 				for ind in val_indices:
-					gt, input_image= stacks_val.get_refresh_v3(ind, 5)
+					gt, input_image= stacks_val.get_refresh_v3(ind, 3)
+
 					input_image = np.expand_dims(input_image,axis=0)
-					output_image, output_normals = sess.run([network,compute_normlas(network)], feed_dict = {net_input: input_image/255.0})
+					output_image, output_normals = sess.run([network,compute_normlas(network)], feed_dict = {net_input: input_image})#/255.0})
 					# output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
 
 
@@ -239,7 +244,7 @@ def main():
 					output_image = (output_image - 1.0) / -2.0 * 255.0
 					output_image = cv2.applyColorMap(np.uint8(output_image), cv2.COLORMAP_JET)
 
-					input_image = input_image[0,time_length-1,:,:,:]
+					input_image = input_image[0,time_length-1,:,:,:] * train_std + train_mean
 
 					output_normals = output_normals[0,time_length-1,:,:,:]
 					output_normals_l2_norm = np.linalg.norm(output_normals,axis = 2) + 1e-12

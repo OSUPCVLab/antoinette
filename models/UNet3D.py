@@ -74,7 +74,7 @@ def conv_transpose_block(inputs, n_filters, kernel_size=(2, 2, 2), strides = (2,
 	  out = slim.dropout(out, keep_prob=(1.0-dropout_p))
 	return out
 
-def build_UNet_3d(inputs, num_classes, preset_model = "UNet-3D", dropout_p=0.5, scope=None):
+def build_UNet_3d(inputs, num_classes, preset_model = "UNet-3D", dropout_p=0.4, scope=None):
 	"""
 	Builds the Encoder-Decoder model. Inspired by SegNet with some modifications
 	Optionally includes skip connections
@@ -108,7 +108,8 @@ def build_UNet_3d(inputs, num_classes, preset_model = "UNet-3D", dropout_p=0.5, 
 	pool_3 = tf.nn.max_pool3d(contr_3_2, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],padding="SAME")
 
 	# Bottleneck
-	pool_3 = slim.dropout(pool_3, keep_prob=(0.4))
+
+	pool_3 = slim.dropout(pool_3, keep_prob = dropout_p)
 
 	encode_1 = conv_block(pool_3, n_filters*4)
 	encode_2 = conv_block(encode_1, n_filters*8)

@@ -1,0 +1,2 @@
+model_checkpoint_path: "C:\\Users\\ajamgard.1\\Desktop\\TemporalPose\\snapshot\\latest_model_EncoderDecoder.ckpt"
+all_model_checkpoint_paths: "C:\\Users\\ajamgard.1\\Desktop\\TemporalPose\\snapshot\\latest_model_EncoderDecoder.ckpt"

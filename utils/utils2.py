@@ -149,25 +149,25 @@ def prepare_data_refresh(dataset_dir, time_length):
     num_folders = 0
     for path, subdirs, files in os.walk(dataset_dir + "\\training"):
 
-        if 'keyframe_1' in path and 'keyframe_10' not in path:
-                if 'raw_color' in path:
-                    train_names['input'].append(path)
-                if 'rigidity' in path:
-                    train_names['output'].append(path)
+        # if 'keyframe_1' in path and 'keyframe_10' not in path:
+        if 'raw_color' in path:
+            train_names['input'].append(path)
+        if 'rigidity' in path:
+            train_names['output'].append(path)
 
     for path, subdirs, files in os.walk(dataset_dir + "\\val"):
-        if 'keyframe_1' in path and 'keyframe_10' not in path:
-                if 'raw_color' in path:
-                    val_names['input'].append(path)
-                if 'rigidity' in path:
-                    val_names['output'].append(path)
+        # if 'keyframe_1' in path and 'keyframe_10' not in path:
+        if 'raw_color' in path:
+            val_names['input'].append(path)
+        if 'rigidity' in path:
+            val_names['output'].append(path)
 
     for path, subdirs, files in os.walk(dataset_dir + "\\test"):
-        if 'keyframe_1' in path and 'keyframe_10' not in path:
-                if 'raw_color' in path:
-                    test_names['input'].append(path)
-                if 'rigidity' in path:
-                    test_names['output'].append(path)
+        # if 'keyframe_1' in path and 'keyframe_10' not in path:
+        if 'raw_color' in path:
+            test_names['input'].append(path)
+        if 'rigidity' in path:
+            test_names['output'].append(path)
 
 
     print('Done reading files!')
@@ -227,10 +227,37 @@ def distance_transform( vol, mode ='unsigned'):
     return img_output_3d
 
 class Stacker:
-    def __init__(self, info, time_length):
+    def __init__(self, info, time_length, data_mean = 0, data_std = 1):
         self.info = info
         self.time_length =time_length
+        self.mean = data_mean
+        self.std = data_std
 
+    def preprocess(self):
+        codec = 'png'
+        if not os.path.isfile(os.path.join(self.info['input'][0], '%06d.%s'%(0, codec))):
+            codec = 'jpg'
+        tmp = cv2.imread(os.path.join(self.info['input'][0], '%06d.%s'%(0, codec)))
+        m = 0
+        n = 0
+        S = 0
+
+
+        # frame = np.zeros(np.shape(tmp))
+        length  = len(self.info['input'])
+        for i in range(length):
+            for j in range(self.time_length):
+                inp = self.info['input'][i]
+                frame = cv2.imread(os.path.join(inp, '%06d.%s'%(j,codec)))
+                prev_mean = m
+                t = np.prod(frame.shape)
+                n = n + 1
+                x = np.mean(np.array(frame))
+                m = m + (x - m) / n
+                S = S + (x - m ) * (x - prev_mean)
+        self.mean = m#/ (length * self.time_length * 1.0)
+        self.std = np.sqrt(S/ (length * self.time_length * 1.0))
+        return self.mean, self.std
 
     def get_data_synthia(self,  frame_number):
         """ Genereate Distance Transform from joints
@@ -289,7 +316,7 @@ class Stacker:
 
         while i < self.time_length:
             ret, frame = cap.read()
-            img_input_3d[i,:,:,:] = cv2.resize(frame, (size,size))
+            img_input_3d[i,:,:,:] = (cv2.resize(frame, (size,size)) - self.mean) / self.std
             temp =  output_mat['segm_{}'.format(i+1)]
             #inside == 0, outside == 1
             temp = cv2.resize(temp, (size,size))
@@ -382,7 +409,7 @@ class Stacker:
         inp = self.info['input'][frame_number]
         out = self.info['output'][frame_number]
         while i < self.time_length:
-            frame = cv2.imread(os.path.join(inp, '%06d.png'%(i)))
+            frame = (cv2.imread(os.path.join(inp, '%06d.png'%(i))) - self.mean) / self.std
             # read uint16 and get R channel ->opencv channels BGR
             temp = cv2.imread(os.path.join(out, '%06d.png'%(i)))[:,:,2]
             # print(temp.shape)
@@ -484,30 +511,35 @@ class Stacker:
             by creating thick skeletons
         """
         size = 128
-        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
-        img_output_3d_inter = np.zeros((self.time_length * scale,size, size), dtype = np.uint8)
-        img_output_3d = np.zeros((self.time_length,size, size), dtype = np.uint8)
+        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.float32)
+        img_output_3d_inter = np.zeros((self.time_length * scale,size, size), dtype = np.float32)
+        img_output_3d = np.zeros((self.time_length,size, size), dtype = np.float32)
         i = 0
 
 
         inp = self.info['input'][frame_number]
         out = self.info['output'][frame_number]
 
+        cropY = 480
+
+        idx = 0
+        if 'city' in self.info['input'][frame_number]:
+            idx = self.time_length + 1
 
 
         while i < self.time_length:
 
-            frame = cv2.imread(os.path.join(inp, '%06d.png'%(i)))
+            frame = (cv2.imread(os.path.join(inp, '%06d.png'%(i+idx))) - self.mean) / self.std
             # read uint16 and get R channel ->opencv channels BGR
-            temp = cv2.imread(os.path.join(out, '%06d.png'%(i)))[:,:,2]
+            temp = cv2.imread(os.path.join(out, '%06d.png'%(i+idx)))[:,:,2]
             # print(temp.shape)
             # print(cv2.resize(frame, (size,size)).shape)
 
-            img_input_3d[i ,:,:,:] = cv2.resize(frame[:,:480], (size,size))
+            img_input_3d[i ,:,:,:] = cv2.resize(frame[:,:cropY], (size,size))
 
 
             #inside == 0, outside == 1
-            temp = temp[:, :480]
+            temp = temp[:, :cropY]
             temp = cv2.resize(temp, (size,size))
             f = temp == 255
 
@@ -530,19 +562,19 @@ class Stacker:
         #
         return img_output_3d, img_input_3d
 
-    def get_posetrack(self,  frame_number):
+    def get_posetrack(self,  frame_number ):
         """ Genereate Distance Transform from joints
             by creating thick skeletons
         """
         size = 128
-        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.uint8)
+        img_input_3d = np.zeros((self.time_length,size, size,3), dtype = np.float32)
+
         i = 0
         inp = self.info['input'][frame_number]
-        print(frame_number)
+        # print(frame_number)
         while i < self.time_length:
-
-            frame = cv2.imread(os.path.join(inp, '%06d.jpg'%(i)))
-            temp = cv2.resize(frame, dsize = None, fx = 0.25, fy = .25)
+            frame = (cv2.imread(os.path.join(inp, '%06d.jpg'%(i)))- self.mean) / self.std
+            temp = cv2.resize(frame, dsize = None, fx = 0.25, fy = 0.25)
             (h,w) = temp.shape[:2]
             # print('dims')
             # print(h//2 - 64, h//2 + 64)
@@ -556,6 +588,9 @@ class Stacker:
             i += 1
 
         return [], img_input_3d
+
+
+
 
 # Use a custom OpenCV function to read the image, instead of the standard
 # TensorFlow `tf.read_file()` operation.
@@ -738,6 +773,8 @@ def interpolated_contour(src, overlay, lab):
     plt.savefig(lab, bbox_inches='tight')
     # im = fig2img(fig)
     # im.save(lab)
+    plt.cla()
+    plt.close(fig)
 
 
 
@@ -805,3 +842,64 @@ def random_crop(size):
     y =  np.random.randint(low = 0, high = 640 - size - 1)
 
     return x, y
+
+
+
+import logging
+import logging.config
+import os.path
+import sys
+from collections import OrderedDict
+
+import tensorflow as tf
+import yaml
+
+from tqdm import tqdm
+
+
+class TqdmHandler(logging.StreamHandler):
+
+    def __init__(self):
+        logging.StreamHandler.__init__(self)
+
+    def emit(self, record):
+        msg = self.format(record)
+        tqdm.write(msg)
+
+
+def config_logging(logfile=None):
+    path = os.path.join(os.path.dirname(__file__), 'logging.yml')
+    with open(path, 'r') as f:
+        config = yaml.load(f.read(), Loader=yaml.FullLoader)
+    if logfile is None:
+        del config['handlers']['file_handler']
+        del config['root']['handlers'][-1]
+    else:
+        config['handlers']['file_handler']['filename'] = logfile
+    logging.config.dictConfig(config)
+
+
+def remove_first_scope(name):
+    return '/'.join(name.split('/')[1:])
+
+def collect_vars(scope, start=None, end=None, prepend_scope=None):
+    vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
+    var_dict = OrderedDict()
+    if isinstance(start, str):
+        for i, var in enumerate(vars):
+            var_name = remove_first_scope(var.op.name)
+            if var_name.startswith(start):
+                start = i
+                break
+    if isinstance(end, str):
+        for i, var in enumerate(vars):
+            var_name = remove_first_scope(var.op.name)
+            if var_name.startswith(end):
+                end = i
+                break
+    for var in vars[start:end]:
+        var_name = remove_first_scope(var.op.name)
+        if prepend_scope is not None:
+            var_name = os.path.join(prepend_scope, var_name)
+        var_dict[var_name] = var
+    return var_dict
