@@ -114,7 +114,7 @@ def main():
 	sess.run(tf.global_variables_initializer())
 
 	model_checkpoint_name = os.path.join(base_dir , "checkpoints\\latest_model_EncoderDecoder.ckpt")
-	saver.restore(sess, model_checkpoint_name)
+	# saver.restore(sess, model_checkpoint_name)
 	avg_loss_per_epoch = []
 	avg_scores_per_epoch = []
 	avg_iou_per_epoch = []

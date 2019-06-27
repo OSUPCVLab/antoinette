@@ -55,10 +55,10 @@ def compute_normlas(inputs):
 	# dt /= norm
 	# dh /= norm
 	# dw /= norm
-
+	#
 	#
 	# normals = tf.concat([dt, dh, dw],4)
-	# normals = (normals + 1.0) /2.0
+	# # normals = (normals + 1.0) /2.0
 	return normals
 
 def combined_loss(net,output):
@@ -87,8 +87,8 @@ def main():
 	config.gpu_options.allow_growth = True
 	sess = tf.Session(config = config)
 	num_classes =  1
-	net_input =  tf.placeholder(tf.float32,shape=[2,time_length,128,128,3])
-	net_output = tf.placeholder(tf.float32,shape=[2,time_length,128,128,1])#,None,num_classes
+	net_input =  tf.placeholder(tf.float32,shape=[None,time_length,128,None,3])
+	net_output = tf.placeholder(tf.float32,shape=[None,time_length,128,None,1])#,None,num_classes
 	net_normals = compute_normlas(net_output)
 	# net_normals = tf.Variable(np.zeros((2,16,128,128,3), dtype = np.float32),  expected_shape = [None,time_length,None,None,3], name = 'normals', trainable=False)
 
@@ -101,20 +101,20 @@ def main():
 
 	## New AdamOptimizer
 	global_step = tf.Variable(0, name='global_step', trainable=False)
-	learning_rate = tf.train.exponential_decay(0.0001, global_step, EPOCHS, 0.9, staircase=True)
+	learning_rate = tf.train.exponential_decay(0.0011, global_step, EPOCHS, 0.9, staircase=True)
 	optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 	opt = optimizer.minimize(loss, global_step=global_step)
 
 	with tf.name_scope('grads'):
 		grads =  optimizer.compute_gradients(loss)
-	for g in grads:
-		tf.summary.histogram("%s_0-grads" % g[1].name[:-2], g[0])
+	# for g in grads:
+	# 	tf.summary.histogram("%s_0-grads" % g[1].name[:-2], g[0])
 
 	saver = tf.train.Saver(max_to_keep  = 1000)
 	sess.run(tf.global_variables_initializer())
 
 	model_checkpoint_name = os.path.join(base_dir , "checkpoints\\latest_model_EncoderDecoder.ckpt")
-	# saver.restore(sess, model_checkpoint_name)
+	#saver.restore(sess, model_checkpoint_name)
 	avg_loss_per_epoch = []
 	avg_scores_per_epoch = []
 	avg_iou_per_epoch = []
@@ -126,12 +126,13 @@ def main():
 	np.random.seed(16)
 
 	val_indices=random.sample(range(0,len(val_lab['input'])),num_vals)
-
-	stacks_train = utils.Stacker(train_lab, time_length)
+	train_mean = 0.0# 138.23202628599907
+	train_std =255.0# 42.661162996076605
+	stacks_train = utils.Stacker(train_lab, time_length, train_mean, train_std)
 	# train_mean, train_std = stacks_train.preprocess()
-	# print(train_mean)
+
 	# print(train_std)
-	stacks_val = utils.Stacker(val_lab, time_length)#, train_mean, train_std)
+	stacks_val = utils.Stacker(val_lab, time_length, train_mean, train_std)
 
 	batch_size  = 2
 	label_values = []
@@ -139,8 +140,8 @@ def main():
 	best_loss = 1e15;
 	total_number_of_input = len(stacks_train.info['input'])
 
-	merged = tf.summary.merge_all()
-	train_writer = tf.summary.FileWriter(os.path.join(base_dir , "logs"), sess.graph)
+	# merged = tf.summary.merge_all()
+	# train_writer = tf.summary.FileWriter(os.path.join(base_dir , "logs"), sess.graph)
 
 	with sess.as_default():
 		start = global_step.eval()
@@ -185,10 +186,9 @@ def main():
 					input_image_batch = np.squeeze(np.stack(input_image_batch, axis=1))
 					output_image_batch = np.stack(output_image_batch, axis=1)[0]
 					# normal_image_batch =  np.squeeze(np.stack(normal_image_batch, axis=1))
-				_, current, summary = sess.run([opt, loss, merged],
+				_, current = sess.run([opt, loss],
 									feed_dict = {net_input : input_image_batch,
 												 net_output: output_image_batch})
-				train_writer.add_summary(summary, epoch)
 
 				current_losses.append(current)
 				cnt += 1
@@ -199,25 +199,28 @@ def main():
 			mean_loss = np.mean(current_losses)
 			avg_loss_per_epoch.append(mean_loss)
 			# Create directories if needed
-			if not os.path.isdir(os.path.join(base_dir , "%s\\%04d"%("checkpoints",epoch))):
-				os.makedirs(os.path.join(base_dir , "%s\\%04d"%("checkpoints",epoch)))
+			# if not os.path.isdir(os.path.join(base_dir , "%s\\%04d"%("checkpoints",epoch))):
+			# 	os.makedirs(os.path.join(base_dir , "%s\\%04d"%("checkpoints",epoch)))
 
+			doSave = False
 			if best_loss > mean_loss:
 				best_loss = mean_loss
 				# Save latest checkpoint to same file name
 				print("Saving latest checkpoint")
 				saver.save(sess,model_checkpoint_name)
-
+				doSave = True
 			global_step.assign(epoch).eval()
 
-			if val_indices != 0 and epoch % 5 == 0:
-				print("Saving checkpoint for this epoch")
-				saver.save(sess,  os.path.join(base_dir , "%s\\%04d\\model.ckpt"%("checkpoints",epoch)))
+			# if val_indices != 0 and epoch % 5 == 0:
+			# 	print("Saving checkpoint for this epoch")
+			# 	saver.save(sess,  os.path.join(base_dir , "%s\\%04d\\model.ckpt"%("checkpoints",epoch)))
 
 
-			if epoch % 1 == 0:
+			# if epoch % 1 == 0:
+			if doSave:
 				print("Performing validation")
-
+				if not os.path.isdir(os.path.join(base_dir , "%s\\%04d"%("checkpoints",epoch))):
+					os.makedirs(os.path.join(base_dir , "%s\\%04d"%("checkpoints",epoch)))
 				scores_list = []
 				class_scores_list = []
 				precision_list = []
@@ -298,6 +301,11 @@ def main():
 			plt.savefig(os.path.join(base_dir , 'loss_vs_epochs.png'))
 
 			plt.cla()
+			# summary,_ = sess.run([merged,opt],
+			# 					feed_dict = {net_input : input_image_batch,
+			# 								 net_output: output_image_batch})
+			# train_writer.add_summary(summary, epoch)
+
 		plt.close(fig2)
 
 

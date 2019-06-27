@@ -22,7 +22,10 @@ def block(inputs, n_filters, kernel_size=[2, 3, 3], strides = [1,1,1], down = Tr
 	with tf.name_scope(scope):
 		# print('**********  //-> {} // ***********'.format(scope))
 		conv = tf.layers.conv3d(inputs, n_filters, kernel_size, strides =strides, activation=None , padding = 'same', use_bias=True, name = 'conv3d_%s_0'%scope)
-		
+		conv = tf.nn.tanh(slim.batch_norm(conv, fused=True))
+		conv = tf.layers.conv3d(conv, n_filters, kernel_size, strides =strides, activation=None , padding = 'same', use_bias=True, name = 'conv3d_%s_1'%scope)
+		conv = tf.nn.tanh(slim.batch_norm(conv, fused=True))
+		conv = tf.layers.conv3d(conv, n_filters, kernel_size, strides =strides, activation=None , padding = 'same', use_bias=True, name = 'conv3d_%s_2'%scope)
 		out = tf.nn.tanh(slim.batch_norm(conv, fused=True))
 		if down:
 			conv = tf.layers.conv3d(out, n_filters, kernel_size, strides =strides, activation=None , padding = 'same', use_bias=True, name = 'conv3d_%s_3'%scope)
@@ -55,7 +58,7 @@ def bulk(inputs, n_blocks, n_filters, kernel_size=[2,3,3], strides = [1,1,1], dr
 		for i in range(n_blocks):
 			# print('**********  // {} // ***********'.format(i))
 			bl = block(inputs, n_filters, filter_bag[i%5], strides, dropout_p=0.0, scope = 'bulk%02d_block%02d'%(index,i))
-
+			
 			if net is None:
 				net = bl
 			else:

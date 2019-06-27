@@ -105,8 +105,8 @@ def main():
     # train_lab, val_lab, test_lab = utils.prepare_data(os.path.join(base_dir , "Data\\SURREAL"), time_length, 'TEST')
     # train_lab, val_lab, test_lab = utils.prepare_data_synthia(os.path.join(base_dir , "Data\\SYNTHIA-SEQS-01-SUMMER"), time_length)
     # test_lab = utils.prepare_video(os.path.join(base_dir , "Data"), time_length, 'TEST')
-    # train_lab,val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
-    train_lab, val_lab, test_lab = utils.prepare_data_posetrack(os.path.join(base_dir , "E:\\Datasets\\Nima\\PoseTrack\\images"), time_length)
+    train_lab,val_lab, test_lab = utils.prepare_data_refresh(os.path.join(base_dir , "Data\\ReFresh"), time_length)
+    #train_lab, val_lab, test_lab = utils.prepare_data_posetrack(os.path.join(base_dir , "E:\\Datasets\\Nima\\PoseTrack\\images"), time_length)
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -117,7 +117,7 @@ def main():
     net_normals = compute_normlas(net_output)
     # network, network_normals = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
 
-    network,_ = model_builder.build_model(model_name='UNet-3D',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
+    network,_ = model_builder.build_model(model_name='Aggregate',frontend ='ResNet101', net_input=net_input, num_classes=num_classes)
     # loss = tf.reduce_mean(tf.nn.l2_loss(network- net_output))#softmax_cross_entropy_with_logits_v2(logits = network, labels = net_output)
 
 
@@ -133,10 +133,12 @@ def main():
 
     saver.restore(sess, model_checkpoint_name)
 
-    stacks_train = utils.Stacker(train_lab, time_length)
-    train_mean, train_std = stacks_train.preprocess()
+    #stacks_train = utils.Stacker(train_lab, time_length)
+    #train_mean, train_std = stacks_train.preprocess()
     # train_mean  =143.33426757268464
     # train_std =17.119051447320118
+    train_mean  = 0
+    train_std = 255.0
 
     stacks_test = utils.Stacker(test_lab, time_length, train_mean, train_std)
 
@@ -154,7 +156,7 @@ def main():
     # score=open("%s\\scores.csv"%("results"),'w')
     # score.write("avg_accuracy, precision, recall, f1 score, mean iou\n" )
     for ind in range(0,len(test_lab['input'])):#
-    	_, input_image = stacks_test.get_posetrack(ind)#get_data(ind)#stacks_test.get_refresh(ind)#
+    	_, input_image = stacks_test.get_refresh_v3(ind,3)#get_data(ind)#stacks_test.get_refresh(ind)#
     	input_image = np.expand_dims(input_image,axis=0)
     	# output_image, output_normals = sess.run([network, network_normals], feed_dict = {net_input: input_image/255.0})
     	# output_image, output_normals = sess.run([network, compute_normlas(network)], feed_dict = {net_input: input_image/255.0})
