@@ -87,8 +87,8 @@ def main():
 	config.gpu_options.allow_growth = True
 	sess = tf.Session(config = config)
 	num_classes =  1
-	net_input =  tf.placeholder(tf.float32,shape=[None,time_length,128,None,3])
-	net_output = tf.placeholder(tf.float32,shape=[None,time_length,128,None,1])#,None,num_classes
+	net_input =  tf.placeholder(tf.float32,shape=[None,time_length,128,128,3])
+	net_output = tf.placeholder(tf.float32,shape=[None,time_length,128,128,1])#,None,num_classes
 	net_normals = compute_normlas(net_output)
 	# net_normals = tf.Variable(np.zeros((2,16,128,128,3), dtype = np.float32),  expected_shape = [None,time_length,None,None,3], name = 'normals', trainable=False)
 
@@ -96,7 +96,7 @@ def main():
 
 	with tf.name_scope('loss'):
 		loss = combined_loss(network,  net_output)
-	tf.summary.scalar('loss', loss)
+	#tf.summary.scalar('loss', loss)
 
 
 	## New AdamOptimizer

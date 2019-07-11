@@ -22,7 +22,7 @@ def block(inputs, n_filters, kernel_size=[2, 3, 3], strides = [1,1,1], down = Tr
 	with tf.name_scope(scope):
 		# print('**********  //-> {} // ***********'.format(scope))
 		conv = tf.layers.conv3d(inputs, n_filters, kernel_size, strides =strides, activation=None , padding = 'same', use_bias=True, name = 'conv3d_%s_0'%scope)
-		
+
 		out = tf.nn.tanh(slim.batch_norm(conv, fused=True))
 		if down:
 			conv = tf.layers.conv3d(out, n_filters, kernel_size, strides =strides, activation=None , padding = 'same', use_bias=True, name = 'conv3d_%s_3'%scope)
@@ -85,28 +85,29 @@ def build_Aggregate(inputs, num_classes, preset_model = "Aggregate", dropout_p=0
 	Aggregate
 	"""
 
-	n_bulks = 5
+	n_bulks = 4
 	net = block(inputs, 64, kernel_size=[3, 3, 3], strides = [1,1,1], dropout_p = 0.0, scope = 'blockFirst')
-
+	strides = [1,2,2,2]
 
 	# print('**********  {} ***********'.format(net.get_shape))
-	for i in range(n_bulks-1):
-		net = bulk(net, 2**(n_bulks-i-1), 2**(2*i+2),index =  i, scope = 'bulk%02d'%i) ## with tf.concat High to low
+	skip_connections = []
+	concats = []
+	for i in range(n_bulks):
+		net = bulk(net, 2**(n_bulks-i), 2**(2*i+2),index =  i, scope = 'bulk%02d'%i) ## with tf.concat High to low
 
 		# net = bulk(net, 1, 2**(8+i),index =  i, scope = 'bulk%02d'%i) ## with tf.add
 
 		with tf.name_scope('maxpool_%02d'%i):
 			# print('**********  //-> {} // ***********'.format('maxpool_%02d'%i))
-			net = tf.nn.max_pool3d(net, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],padding="SAME")
-		# print('**********  {} ***********'.format(net.get_shape))
-	first_tlayer = True
-	for i in range(n_bulks - 2, -1, -1):
-		if first_tlayer:
-			net = transpose_bulk(net, 1, 2**(7+i), strides=[1,2,2], index = i + 1, scope = 'tBulk%02d'%(i+1))
-			first_tlayer = False
-		else:
-			net = transpose_bulk(net, 1, 2**(6+i), index = i + 1, scope = 'tBulk%02d'%(i+1))
-		# print('**********  {} ***********'.format(net.get_shape))
+			net = tf.nn.max_pool3d(net, ksize=[1, 2, 2, 2, 1], strides=[1, strides[i],  strides[i], strides[i], 1],padding="SAME") # exp 19 was [2,2,2]
+		skip_connections.append(net)
+		#print('**********  {} ***********'.format(net.get_shape))
+
+	for i in range(n_bulks,0,-1):
+		net = transpose_bulk(net, 1, 2**(5+i), strides=[strides[n_bulks-i],strides[n_bulks-i],strides[n_bulks-i]], index = i, scope = 'tBulk%02d'%(i))  # exp 19 was 2**(7+i), strides = [1,2,2]
+		net = tf.add(net, skip_connections[i-1])
+		#print('**********  {} ***********'.format(net.get_shape))
+
 
 
 	final = slim.conv3d(net, num_classes, (1,1,1), activation_fn= tf.nn.tanh, scope='logits')
